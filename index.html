@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="format-detection" content="telephone=no" />  
-  <!-- 1. Renamed the application. -->
-  <title>Asphalt Yield Calculator</title>
+  <meta name="format-detection" content="telephone=no" />
+  <!-- 4. App Name: Change the app's name to "HMA Paving". -->
+  <title>HMA Paving</title>
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <!-- Manifest for PWA -->
   <link rel="manifest" href="manifest.json" />
@@ -14,9 +14,12 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192x192.png" />
   <!-- Additional favicon format for better browser compatibility -->
   <link rel="shortcut icon" href="icons/icon-192x192.png" type="image/png" />
+  <!-- 12. Include SheetJS library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 
   <style>
-    /* ===== Base Styling with Reduced Fonts/Fields (Request #9) ===== */
+    /* ===== Base Styling with Reduced Fonts/Fields ===== */
     :root {
       --primary: #2b5797;
       --secondary: #4472c4;
@@ -25,7 +28,8 @@
       --dark: #333;
       --success: #5cb85c;
       --danger: #d9534f;
-      
+      --warning: #f0ad4e;
+
       /* Light Mode Colors (default) */
       --background: var(--light);
       --card-bg: white;
@@ -37,7 +41,7 @@
       --border-color: #ddd;
       --hamburger-color: var(--primary);
     }
-    
+
     /* Dark Mode Colors */
     [data-theme="dark"] {
       --background: #121212;
@@ -139,7 +143,7 @@
     .tab-content {
       display: none;
       padding: 10px;
-      max-height: calc(100vh - 120px);
+      max-height: calc(100vh - 120px); /* Adjust as needed */
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
@@ -183,11 +187,11 @@
       flex: 1;
     }
 
-    .current-results, .total-results {
+    .current-results, .run-summary-results, .day-summary-results { /* Updated class name */
       background-color: var(--input-bg);
-      padding: 15px; /* Increased from 10px */
+      padding: 10px; /* Adjusted from 15px */
       border-radius: 5px;
-      margin-bottom: 15px; /* Increased from 0 */
+      margin-bottom: 10px; /* Adjusted from 15px */
       transition: background-color 0.3s ease;
     }
 
@@ -195,10 +199,12 @@
       display: flex;
       justify-content: space-between;
       margin-bottom: 5px;
+      font-size: 0.9rem; /* Slightly smaller result font */
     }
 
     .result-label {
       font-weight: bold;
+      margin-right: 5px;
     }
 
     /* Data Table */
@@ -206,7 +212,7 @@
       overflow-x: auto;
       max-width: 100%;
       margin-top: 10px;
-      max-height: calc(100vh - 200px);
+      max-height: calc(100vh - 250px); /* Adjusted max-height */
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
@@ -218,12 +224,29 @@
 
     .truck-data-table th,
     .truck-data-table td {
-      padding: 8px;
+      padding: 6px; /* Reduced padding */
       text-align: left;
       border-bottom: 1px solid var(--border-color);
-      font-size: 0.9rem;
+      font-size: 0.85rem; /* Reduced font size */
       transition: border-color 0.3s ease;
+      /* 11. Improve Mobile Display: word break */
+      word-break: break-word;
+      white-space: normal; /* Allow wrapping */
     }
+
+    /* 11. Improve Mobile Display: Adjust column widths (example) */
+    .truck-data-table th:nth-child(1), /* Load # */
+    .truck-data-table td:nth-child(1) { width: 10%; }
+    .truck-data-table th:nth-child(2), /* Start Sta */
+    .truck-data-table td:nth-child(2) { width: 12%; }
+    .truck-data-table th:nth-child(3), /* End Sta */
+    .truck-data-table td:nth-child(3) { width: 12%; }
+    .truck-data-table th:nth-child(4), /* Length */
+    .truck-data-table td:nth-child(4) { width: 10%; }
+    .truck-data-table th:nth-child(5), /* Width */
+    .truck-data-table td:nth-child(5) { width: 10%; }
+    /* Others can take remaining space */
+
 
     .truck-data-table tr:nth-child(even) {
       background-color: var(--table-even);
@@ -240,6 +263,7 @@
       color: #fff;
       position: sticky;
       top: 0;
+      z-index: 1; /* Ensure header stays above scrolling content */
     }
 
     .truck-data-table tfoot {
@@ -251,6 +275,26 @@
     .truck-data-table tfoot td {
       border-top: 2px solid var(--primary);
     }
+
+    /* 10. Visual Separators for Archive */
+    .run-separator td {
+        border-top: 3px solid var(--primary) !important;
+        border-bottom: 1px solid var(--primary) !important;
+        background-color: var(--secondary) !important;
+        color: white !important;
+        font-weight: bold;
+        font-size: 0.8rem !important;
+        padding: 5px !important;
+        text-align: center;
+    }
+    .run-separator td span {
+        display: block;
+        margin-top: 3px;
+        font-weight: normal;
+        font-style: italic;
+        font-size: 0.75rem;
+    }
+
 
     .delete-btn {
       color: var(--danger);
@@ -299,97 +343,109 @@
       }
     }
 
-    /* Mobile layout adjustments for two-column layout */
+    /* Mobile layout adjustments */
     @media (max-width: 768px) {
       .flex-container {
-        flex-direction: row; /* Keep as row for small screens */
-        flex-wrap: wrap;
+        flex-direction: column; /* Stack vertically on mobile */
       }
-      
+
       .flex-container > * {
-        min-width: calc(50% - 5px); /* Two columns with gap consideration */
-        width: calc(50% - 5px);
+        min-width: 100%; /* Full width for children */
+        width: 100%;
       }
-      
+
       .input-section, .results-container {
-        flex: 0 0 100%; /* Full width container */
+        flex-basis: auto; /* Reset flex-basis */
       }
-      
-      /* Create two columns for input fields */
+
+      /* Keep two columns for input grid if possible */
       .input-grid {
-        display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 5px;
       }
-      
-      /* Make labels and inputs smaller */
+
       .form-group label {
         font-size: 0.8rem;
         margin-bottom: 2px;
       }
-      
+
       .form-group input {
         padding: 4px;
         font-size: 0.8rem;
-        min-width: 0; /* Allow inputs to shrink as needed */
-        width: 100%; /* Ensure inputs use full width of their container */
+        min-width: 0;
+        width: 100%;
       }
-      
-      /* Create two columns for results */
+
+      /* Stack results vertically */
       .results-container {
-        flex-direction: row;
-        flex-wrap: wrap;
+        flex-direction: column;
       }
-      
-      .current-results, .total-results {
-        flex: 0 0 calc(50% - 5px);
+
+      .current-results, .run-summary-results, .day-summary-results {
+        flex-basis: auto;
         padding: 8px;
+        margin-bottom: 8px;
       }
-      
-      /* Button group takes full width */
+
       .button-group {
-        flex: 0 0 100%;
+        flex-direction: column; /* Stack buttons vertically */
+        align-items: stretch; /* Make buttons full width */
       }
-      
-      /* Make result text smaller */
+      .button-group button {
+        width: 100%;
+        margin-bottom: 5px;
+      }
+       .button-group button:last-child {
+        margin-bottom: 0;
+      }
+
+
       .result-row {
         font-size: 0.8rem;
       }
-      
-      /* Make headings smaller */
+
       h2 {
         font-size: 1rem;
         margin: 0 0 5px 0;
       }
-      
-      /* Reduce padding */
+
       .container {
         padding: 3px;
         padding-top: 20px;
       }
-      
+
       .tab-content {
         padding: 3px;
+        max-height: calc(100vh - 100px); /* Adjusted for mobile */
       }
-      
+
       .input-section {
         padding: 6px;
         margin-bottom: 5px;
       }
-      
-      .current-results, .total-results {
-        padding: 6px;
-      }
-      
+
       header {
         margin-bottom: 5px;
         padding-bottom: 2px;
       }
-      
+
       .current-date {
         font-size: 0.8rem;
         padding: 3px 0;
       }
+
+       /* 11. Improve Mobile Display: Further optimization for data tables */
+      .truck-data-table th,
+      .truck-data-table td {
+          padding: 4px; /* Even smaller padding */
+          font-size: 0.75rem; /* Smaller font */
+      }
+      .truck-data-table tfoot td {
+          font-size: 0.8rem;
+      }
+       .data-table-container {
+           max-height: calc(100vh - 300px); /* Adjust based on other elements */
+       }
     }
 
     /* Form & Input Styling */
@@ -437,30 +493,37 @@
 
     .button-group {
       display: flex;
-      gap: 5px;
-      margin-top: 20px; /* Increased from 10px */
-      margin-bottom: 20px; /* Added bottom margin */
+      gap: 10px; /* Increased gap */
+      margin-top: 15px; /* Adjusted from 20px */
+      margin-bottom: 10px; /* Adjusted from 20px */
       justify-content: center; /* Center the buttons horizontally */
+      flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
     }
-    
-    /* Larger export and reset buttons */
-    .export-btn, .reset-btn {
-      padding: 10px 15px;
-      font-size: 1.1rem;
+
+    /* Specific button styling */
+    .action-btn {
+      padding: 8px 12px; /* Standardized padding */
+      font-size: 0.95rem; /* Standardized font size */
       font-weight: bold;
       border-radius: 6px;
-      box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       transition: all 0.3s ease;
+      flex: 1; /* Allow buttons to grow */
+      min-width: 120px; /* Minimum width */
     }
-    
-    .export-btn:hover, .reset-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 8px rgba(0, 0, 0, 0.15);
+     .action-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
     }
-    
+
+    .start-run-btn { background-color: var(--danger); } /* Use danger color for Start Run/Reset */
+    .save-btn { background-color: var(--success); }
+    .undo-btn { background-color: var(--warning); color: var(--dark); }
+
+
     /* Results Sections */
     .results-section {
-      margin-top: 20px; /* Increased from 10px */
+      margin-top: 15px; /* Adjusted from 20px */
     }
 
     /* Add hamburger menu styles */
@@ -494,32 +557,12 @@
       transition: .15s ease-in-out, background-color 0.3s ease;
     }
 
-    .hamburger-icon span:nth-child(1) {
-      top: 0px;
-    }
-
-    .hamburger-icon span:nth-child(2) {
-      top: 10px;
-    }
-
-    .hamburger-icon span:nth-child(3) {
-      top: 20px;
-    }
-
-    .hamburger-icon.open span:nth-child(1) {
-      top: 10px;
-      transform: rotate(45deg);
-    }
-
-    .hamburger-icon.open span:nth-child(2) {
-      opacity: 0;
-      left: -30px;
-    }
-
-    .hamburger-icon.open span:nth-child(3) {
-      top: 10px;
-      transform: rotate(-45deg);
-    }
+    .hamburger-icon span:nth-child(1) { top: 0px; }
+    .hamburger-icon span:nth-child(2) { top: 10px; }
+    .hamburger-icon span:nth-child(3) { top: 20px; }
+    .hamburger-icon.open span:nth-child(1) { top: 10px; transform: rotate(45deg); }
+    .hamburger-icon.open span:nth-child(2) { opacity: 0; left: -30px; }
+    .hamburger-icon.open span:nth-child(3) { top: 10px; transform: rotate(-45deg); }
 
     .sidebar {
       position: fixed;
@@ -537,43 +580,20 @@
       transition: background-color 0.3s ease, left 0.3s, color 0.3s ease;
     }
 
-    .sidebar.open {
-      left: 0;
-    }
-
-    .sidebar-menu {
-      list-style: none;
-      padding: 0;
-    }
-
+    .sidebar.open { left: 0; }
+    .sidebar-menu { list-style: none; padding: 0; }
     .sidebar-menu li {
-      padding: 15px;
-      padding-left: 15px;
+      padding: 12px 15px; /* Slightly reduced padding */
       border-bottom: 1px solid var(--border-color);
       cursor: pointer;
       font-weight: bold;
+      font-size: 0.95rem; /* Slightly smaller font */
       color: var(--text-color);
       transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
     }
+    .sidebar-menu li:hover { background-color: var(--accent); color: white; }
 
-    .sidebar-menu li:hover {
-      background-color: var(--accent);
-      color: white;
-    }
-
-    #exportAllDataButton:hover {
-      background-color: var(--accent);
-      color: white;
-      cursor: pointer;
-    }
-    
-    #exportAllDataButton {
-      display: block;
-      position: relative;
-      padding: 15px;
-      border-bottom: 1px solid var(--border-color);
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
+    /* Removed #exportAllDataButton styles */
 
     .sidebar-menu li.active {
       background-color: var(--primary);
@@ -593,11 +613,7 @@
       opacity: 0;
       transition: 0.3s;
     }
-
-    .overlay.open {
-      visibility: visible;
-      opacity: 1;
-    }
+    .overlay.open { visibility: visible; opacity: 1; }
 
     /* Current date display */
     .current-date {
@@ -610,12 +626,8 @@
       font-size: 0.9rem;
       margin-bottom: 2px; /* Reduced from 3px */
     }
-    
-    /* Make date display orange in dark mode */
-    [data-theme="dark"] .current-date {
-      color: var(--accent);
-    }
-    
+    [data-theme="dark"] .current-date { color: var(--accent); }
+
     /* Archive Modal Styles */
     #archiveModal {
       display: none;
@@ -627,20 +639,23 @@
       background-color: rgba(0, 0, 0, 0.5);
       z-index: 1000;
     }
-    
+
     .archive-modal-content {
       position: relative;
       background-color: var(--card-bg);
-      margin: 10% auto;
-      padding: 20px;
-      width: 90%;
-      max-width: 800px;
+      margin: 5% auto; /* Reduced top margin */
+      padding: 15px; /* Reduced padding */
+      width: 95%; /* Wider */
+      max-width: 900px; /* Max width */
       border-radius: 8px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
       color: var(--text-color);
       transition: background-color 0.3s ease, color 0.3s ease;
+      display: flex; /* Use flexbox for layout */
+      flex-direction: column;
+      max-height: 90vh; /* Limit height */
     }
-    
+
     .archive-close {
       position: absolute;
       top: 10px;
@@ -649,15 +664,26 @@
       font-weight: bold;
       cursor: pointer;
     }
-    
+
+    #archiveModal .data-table-container {
+        flex-grow: 1; /* Allow table container to fill space */
+        max-height: calc(85vh - 150px); /* Adjust based on header/footer */
+        margin-bottom: 10px;
+    }
+
+
     @media (max-width: 768px) {
       .archive-modal-content {
-        margin: 5% auto;
+        margin: 2% auto;
         padding: 10px;
-        width: 95%;
+        width: 98%;
+        max-height: 95vh;
       }
+       #archiveModal .data-table-container {
+           max-height: calc(90vh - 130px);
+       }
     }
-    
+
     /* Dark Mode Toggle Styles */
     .sidebar-menu .divider {
       border-bottom: 1px solid var(--border-color);
@@ -667,14 +693,14 @@
       height: 0;
       opacity: 0.7;
     }
-    
+
     .settings-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       background-color: rgba(128, 128, 128, 0.1);
     }
-    
+
     .toggle-switch {
       display: inline-block;
       background: rgba(150, 150, 150, 0.4);
@@ -688,11 +714,7 @@
       box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
       margin-left: 10px;
     }
-    
-    .toggle-switch:before, .toggle-switch:after {
-      content: "";
-    }
-    
+    .toggle-switch:before, .toggle-switch:after { content: ""; }
     .toggle-switch:before {
       display: block;
       background: #fff;
@@ -705,17 +727,8 @@
       transition: all 0.25s ease;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
-    
-    .toggle-switch.active {
-      background: var(--accent);
-    }
-    
-    .toggle-switch.active:before {
-      left: 23px;
-      background-color: #fff;
-    }
-    
-    /* Add icons for day/night */
+    .toggle-switch.active { background: var(--accent); }
+    .toggle-switch.active:before { left: 23px; background-color: #fff; }
     .toggle-switch:after {
       font-family: sans-serif;
       content: "☼";
@@ -725,15 +738,9 @@
       font-size: 12px;
       color: rgba(255, 255, 255, 0.4);
     }
-    
-    .toggle-switch.active:after {
-      content: "☾";
-      left: 7px;
-      right: auto;
-      color: rgba(255, 255, 255, 0.8);
-    }
+    .toggle-switch.active:after { content: "☾"; left: 7px; right: auto; color: rgba(255, 255, 255, 0.8); }
 
-    /* Calculator results styling - apply at all screen sizes */
+    /* Calculator results styling */
     #paverSpeedTab .results-container,
     #projLengthTab .results-container,
     #tonnageTab .results-container {
@@ -742,7 +749,7 @@
       text-align: center;
       width: 100%;
     }
-    
+
     #paverSpeedTab .current-results,
     #projLengthTab .current-results,
     #tonnageTab .current-results {
@@ -752,31 +759,28 @@
       border: 1px solid var(--input-border);
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    
+
     #paverSpeedResult,
     #projLengthResult,
     #tonCalcResult {
       font-size: 1.4rem;
       font-weight: bold;
-      /* Change the color to be blue in light mode */
       color: var(--primary) !important;
       display: inline-block;
       padding: 2px 10px;
-      /* Update background color to match the blue */
       background-color: rgba(43, 87, 151, 0.1) !important;
       border-radius: 4px;
       min-width: 80px;
       text-align: right;
     }
-    
-    /* Keep the accent color for dark mode */
+
     [data-theme="dark"] #paverSpeedResult,
     [data-theme="dark"] #projLengthResult,
     [data-theme="dark"] #tonCalcResult {
       color: var(--accent) !important;
       background-color: rgba(237, 125, 49, 0.1) !important;
     }
-    
+
     #paverSpeedTab .result-row,
     #projLengthTab .result-row,
     #tonnageTab .result-row {
@@ -788,36 +792,21 @@
 
     /* Additional styling for mobile calculators */
     @media (max-width: 768px) {
-      /* Adjust container and tab content padding for full width */
-      .container {
-        padding: 2px;
-      }
-      
-      .tab-content {
-        padding: 2px;
-      }
-      
       /* Apply full width to main yield calculator too */
       #yieldTab .flex-container {
-        flex-direction: column;
-        gap: 8px;
-        margin: 0;
-        width: 100%;
+        /* Already set to column */
       }
-      
+
       #yieldTab .input-section,
       #yieldTab .results-container,
       #yieldTab .current-results,
-      #yieldTab .total-results {
+      #yieldTab .run-summary-results,
+      #yieldTab .day-summary-results {
         width: 100%;
         margin: 0 0 8px 0;
         box-sizing: border-box;
       }
-      
-      #yieldTab .button-group {
-        width: 100%;
-      }
-      
+
       /* Common styling for all calculator tabs */
       #paverSpeedTab .flex-container,
       #projLengthTab .flex-container,
@@ -828,7 +817,7 @@
         margin: 0;
         width: 100%;
       }
-      
+
       #paverSpeedTab .input-section,
       #projLengthTab .input-section,
       #tonnageTab .input-section {
@@ -837,20 +826,16 @@
         background-color: var(--input-bg);
         border-radius: 5px;
         border: 1px solid var(--input-border);
-        width: 100%; 
+        width: 100%;
         box-sizing: border-box;
       }
-      
-      /* Keep result containers centered on mobile too */
+
       #paverSpeedTab .results-container,
       #projLengthTab .results-container,
       #tonnageTab .results-container {
-        /* Reaffirm the centering for mobile */
-        margin: 15px auto;
-        /* Inherit max-width from the main style */
+        margin: 10px auto; /* Reduced margin */
       }
-      
-      /* Make tab content use full width */
+
       #paverSpeedTab,
       #projLengthTab,
       #tonnageTab {
@@ -858,7 +843,7 @@
         width: 100%;
         box-sizing: border-box;
       }
-    
+
       #paverSpeedTab h2,
       #projLengthTab h2,
       #tonnageTab h2 {
@@ -867,7 +852,7 @@
         text-align: center;
         width: 100%;
       }
-      
+
       #paverSpeedTab h3,
       #projLengthTab h3,
       #tonnageTab h3 {
@@ -876,7 +861,7 @@
         text-align: center;
         width: 100%;
       }
-      
+
       /* Create two columns for input fields in calculator tabs */
       #paverSpeedTab .input-grid,
       #projLengthTab .input-grid,
@@ -886,15 +871,14 @@
         gap: 8px;
         width: 100%;
       }
-      
-      /* Ensure form elements are compact but fully visible */
+
       #paverSpeedTab .form-group,
       #projLengthTab .form-group,
       #tonnageTab .form-group {
         margin-bottom: 5px;
         width: 100%;
       }
-      
+
       #paverSpeedTab .form-group label,
       #projLengthTab .form-group label,
       #tonnageTab .form-group label {
@@ -902,7 +886,7 @@
         margin-bottom: 3px;
         display: block;
       }
-      
+
       #paverSpeedTab .form-group input,
       #projLengthTab .form-group input,
       #tonnageTab .form-group input {
@@ -911,107 +895,51 @@
         height: 2.2em;
         width: 100%;
         box-sizing: border-box;
-        min-width: 0; /* Allow inputs to shrink as needed */
+        min-width: 0;
       }
-      
-      /* Make result text more prominent */
+
       #paverSpeedResult,
       #projLengthResult,
       #tonCalcResult {
-        font-size: 1.4rem;
-        font-weight: bold;
-        color: var(--primary);
-        display: inline-block;
-        padding: 2px 10px;
-        background-color: rgba(43, 87, 151, 0.1);
-        border-radius: 4px;
-        min-width: 80px;
-        text-align: right;
-      }
-      
-      /* Keep the accent color for dark mode on mobile too */
-      [data-theme="dark"] #paverSpeedResult,
-      [data-theme="dark"] #projLengthResult,
-      [data-theme="dark"] #tonCalcResult {
-        color: var(--accent);
-        background-color: rgba(237, 125, 49, 0.1);
-      }
-      
-      /* Improve result row layout */
-      #paverSpeedTab .result-row,
-      #projLengthTab .result-row,
-      #tonnageTab .result-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 5px;
+        font-size: 1.2rem; /* Slightly smaller on mobile */
       }
     }
 
-    @media (max-width: 320px) {
-      /* For very small screens, switch to single column */
+
+    @media (max-width: 360px) { /* Stricter rules for very small screens */
+      /* Single column input grid */
+      .input-grid,
       #paverSpeedTab .input-grid,
       #projLengthTab .input-grid,
-      #tonnageTab .input-grid,
-      .input-grid {
+      #tonnageTab .input-grid {
         grid-template-columns: 1fr;
       }
-      
-      /* Ensure smaller results containers remain centered */
-      #paverSpeedTab .results-container,
-      #projLengthTab .results-container,
-      #tonnageTab .results-container {
-        max-width: 95%;
-        padding: 0 5px;
+
+       .form-group input {
+        font-size: 0.75rem;
+        padding: 3px;
       }
-      
-      /* Make result values fit better on tiny screens */
-      #paverSpeedResult,
-      #projLengthResult, 
-      #tonCalcResult {
-        font-size: 1.2rem;
-        min-width: 60px;
+       .form-group label {
+        font-size: 0.7rem;
       }
-      
-      /* Adjust result rows for tiny screens */
-      #paverSpeedTab .result-row,
-      #projLengthTab .result-row,
-      #tonnageTab .result-row {
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-      
-      /* Labels should be full width on tiny screens */
-      #paverSpeedTab .result-label,
-      #projLengthTab .result-label,
-      #tonnageTab .result-label {
-        display: block;
-        width: 100%;
-        text-align: center;
-        margin-bottom: 3px;
-      }
-      
-      .form-group input {
-        min-width: 0; /* Remove minimum width completely */
-        font-size: 0.75rem; /* Make text slightly smaller */
-        padding: 3px; /* Reduce padding further */
-      }
-      
-      .form-group label {
-        font-size: 0.7rem; /* Make labels smaller too */
-      }
-      
-      /* Further reduce padding for tiny screens */
-      .input-section,
-      .current-results, 
-      .total-results {
-        padding: 4px;
-      }
-      
-      /* Smaller headings */
-      h2 {
-        font-size: 0.9rem;
-      }
+
+       .results-container { gap: 5px; }
+       .current-results, .run-summary-results, .day-summary-results { padding: 6px; margin-bottom: 5px;}
+       .result-row { font-size: 0.75rem;}
+
+       h2 { font-size: 0.9rem; }
+       .action-btn { font-size: 0.85rem; padding: 6px 10px; min-width: 100px;}
+
+        /* Smaller table fonts */
+        .truck-data-table th,
+        .truck-data-table td {
+          padding: 3px;
+          font-size: 0.7rem;
+        }
+        .truck-data-table tfoot td {
+          font-size: 0.75rem;
+        }
+         .delete-btn { font-size: 1rem;}
     }
   </style>
 </head>
@@ -1024,76 +952,72 @@
       <span></span>
     </div>
   </div>
-  
+
   <div class="sidebar">
     <ul class="sidebar-menu">
       <li class="active" data-tab="yieldTab">Yield Calc</li>
-      <li data-tab="dataTab">Data History</li>
+      <!-- 8. Data History Label -> Renamed -->
+      <li data-tab="dataTab">Current Run / History</li>
       <li data-tab="paverSpeedTab">Paver Speed Calc</li>
       <li data-tab="projLengthTab">Projected Length Calc</li>
       <li data-tab="tonnageTab">Tonnage Calc</li>
-      <li id="exportAllDataButton">Export All Data</li>
+      <!-- 13. Remove "Export All Data" -->
+      <!-- <li id="exportAllDataButton">Export All Data</li> -->
+      <li id="exportDataButton">Export Data</li>
       <li id="aboutButton">About</li>
       <li id="darkModeToggle" class="settings-item">Dark Mode <span class="toggle-switch" id="darkModeSwitch"></span></li>
     </ul>
   </div>
-  
+
   <div class="overlay"></div>
 
   <div class="container">
     <header>
-      <!-- 1. Application Name Updated -->
-      <!-- Current date display (moved inside header) -->
+      <!-- Current date display -->
       <div class="current-date" id="currentDateDisplay"></div>
     </header>
-    
+
     <!-- Tab Navigation -->
     <div class="tab-container">
-    
 
       <!-- ===== Yield Calculator Tab Content ===== -->
       <div class="tab-content active" id="yieldTab">
-        <!-- Flex container for side-by-side layout -->
+        <!-- Flex container for layout -->
         <div class="flex-container">
           <!-- Left side: Input fields -->
           <div class="input-section">
             <h2>Truck Information</h2>
             <div class="input-grid">
-              
-              <!-- Remove date input field -->
-              
               <div class="form-group">
                 <label for="truckNumber">Load Number:</label>
                 <input type="number" id="truckNumber" min="0" step="1" placeholder="Enter load identifier" inputmode="numeric" pattern="[0-9]*" />
               </div>
-
               <div class="form-group">
                 <label for="truckTonnage">Truck Tonnage (tons):</label>
                 <input type="number" id="truckTonnage" step="0.01" min="0" placeholder="Enter tonnage" inputmode="decimal" />
               </div>
-
               <div class="form-group">
                 <label for="startValue">Start Sta.:</label>
                 <input type="number" id="startValue" step="0.01" min="0" placeholder="Enter start station" inputmode="decimal" />
               </div>
-
               <div class="form-group">
                 <label for="endValue">End Sta.:</label>
                 <input type="number" id="endValue" step="0.01" min="0" placeholder="Enter end station" inputmode="decimal" />
               </div>
-
               <div class="form-group">
                 <label for="width">Width (feet):</label>
                 <input type="number" id="width" step="0.01" min="0" placeholder="Enter width" inputmode="decimal" />
               </div>
-
               <div class="form-group">
                 <label for="calculatedLength">Calculated Length (feet):</label>
                 <input type="number" id="calculatedLength" readonly />
               </div>
-              
-              <!-- 7. "Save Truck Data" without forcing calculation click first -->
-              <button id="saveTruckButton" disabled>Save Truck Data</button>
+            </div>
+             <!-- Buttons below input grid -->
+             <div class="button-group">
+                 <!-- 15. Add Undo Button -->
+                 <button id="undoButton" class="action-btn undo-btn" disabled>Undo Last Save</button>
+                 <button id="saveTruckButton" class="action-btn save-btn" disabled>Save Truck Data</button>
             </div>
           </div>
 
@@ -1115,29 +1039,52 @@
               </div>
             </div>
 
-            <div class="total-results">
-              <h2>Day Summary</h2>
+            <!-- 7. Add "Current Run" Summary -->
+            <div class="run-summary-results">
+              <h2>Current Run Summary</h2>
+              <div class="result-row">
+                <span class="result-label">Run Trucks:</span>
+                <span id="runTotalTrucks">0</span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">Run Area (sq yd):</span>
+                <span id="runTotalArea">0.00</span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">Run Weight (lbs):</span>
+                <span id="runTotalWeight">0.00</span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">Run Avg Yield:</span>
+                <span id="runAverageYield">0.00</span>
+              </div>
+            </div>
+
+            <div class="day-summary-results"> <!-- Renamed class for clarity -->
+              <!-- 6. Daily Yield Calculation (Day Summary) -->
+              <h2>Day Summary (Calendar Day)</h2>
               <div class="result-row">
                 <span class="result-label">Total Trucks:</span>
-                <span id="totalTrucks">0</span>
+                <span id="dayTotalTrucks">0</span>
               </div>
               <div class="result-row">
                 <span class="result-label">Total Area (sq yd):</span>
-                <span id="totalArea">0</span>
+                <span id="dayTotalArea">0.00</span>
               </div>
               <div class="result-row">
                 <span class="result-label">Total Weight (lbs):</span>
-                <span id="totalWeight">0</span>
+                <span id="dayTotalWeight">0.00</span>
               </div>
               <div class="result-row">
-                <span class="result-label">Average Yield (lbs/sq yd):</span>
-                <span id="averageYield">0</span>
+                <span class="result-label">Average Yield:</span>
+                <span id="dayAverageYield">0.00</span>
               </div>
             </div>
-            
+
             <div class="button-group">
-              <button class="reset-btn" id="resetButton" style="background-color: var(--danger); margin: 0 auto;">
-                Start New Day
+              <!-- 1. Rename "Start New Day" Button -->
+              <button class="action-btn start-run-btn" id="startNewRunButton">
+                Start New Run
               </button>
             </div>
           </div>
@@ -1146,8 +1093,9 @@
       <!-- End of Yield Calculator Tab -->
 
       <!-- ===== Data History Tab Content ===== -->
+      <!-- 8. Update Title -->
       <div class="tab-content" id="dataTab">
-        <h2>Today's Loads</h2>
+        <h2>Today's Runs</h2>
         <div class="data-table-container">
           <table class="truck-data-table" id="truckDataTable">
             <thead>
@@ -1161,7 +1109,6 @@
                 <th>Tonnage</th>
                 <th>Weight (lbs)</th>
                 <th>Yield (lbs/sq yd)</th>
-                <!-- 2. Removed Time Feature => remove "Time" column -->
                 <th>Date</th>
                 <th>Action</th>
               </tr>
@@ -1171,38 +1118,43 @@
             </tbody>
             <tfoot id="truckDataFooter">
               <tr>
-                <td>Totals:</td>
+                <td>Run Totals:</td>
                 <td>-</td>
                 <td>-</td>
-                <td id="totalLength">0.00</td>
+                <td id="runTotalLengthFoot">0.00</td>
                 <td>-</td>
-                <td id="totalAreaFoot">0.00</td>
-                <td id="totalTonnageFoot">0.00</td>
-                <td id="totalWeightFoot">0.00</td>
-                <td id="avgYieldFoot">0.00</td>
+                <td id="runTotalAreaFoot">0.00</td>
+                <td id="runTotalTonnageFoot">0.00</td>
+                <td id="runTotalWeightFoot">0.00</td>
+                <td id="runAvgYieldFoot">0.00</td>
                 <td>-</td>
                 <td>-</td>
               </tr>
             </tfoot>
           </table>
         </div>
-        
+
         <!-- Archive Button -->
         <div style="margin-top: 15px; text-align: center;">
-          <button id="viewArchivesButton" style="background-color: var(--secondary);">View Previous Days</button>
+          <!-- 8. Rename button text -->
+          <button id="viewArchivesButton" style="background-color: var(--secondary);" class="action-btn">View Previous Days' Runs</button>
         </div>
-        
+
         <!-- Archive Modal -->
         <div id="archiveModal">
           <div class="archive-modal-content">
-            <span id="closeArchiveModal" class="archive-close">&times;</span>
-            <h2>Previous Days' Data</h2>
-            <div style="margin-bottom: 15px;">
-              <select id="archiveDateSelect" style="width: 100%; padding: 8px; margin-bottom: 10px; background-color: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); border-radius: 4px;">
+            <span id="closeArchiveModal" class="archive-close">×</span>
+            <h2>Previous Days' Run Data</h2>
+            <div style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center;">
+              <select id="archiveDateSelect" style="flex-grow: 1; padding: 8px; background-color: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); border-radius: 4px;">
                 <option value="">Select a date...</option>
               </select>
+               <!-- 13. Rename Export button -->
+              <button id="exportArchiveButton" class="action-btn save-btn" style="flex-shrink: 0;">Export Day (Excel)</button>
             </div>
-            <div class="data-table-container" style="max-height: 400px; overflow-y: auto;">
+            <!-- 9. Display Runs within Day -> Table container takes remaining space -->
+            <div class="data-table-container" style="max-height: 65vh;">
+              <!-- 11. Improve Mobile Display -> Styles applied via CSS -->
               <table class="truck-data-table" id="archiveDataTable">
                 <thead>
                   <tr>
@@ -1216,14 +1168,15 @@
                     <th>Weight (lbs)</th>
                     <th>Yield (lbs/sq yd)</th>
                     <th>Date</th>
+                    <!-- 3. Add Remarks Feature: No column needed if shown in separator -->
                   </tr>
                 </thead>
                 <tbody id="archiveDataBody">
-                  <!-- Archive data will be loaded here -->
+                  <!-- Archive data will be loaded here, including separators -->
                 </tbody>
                 <tfoot id="archiveDataFooter">
                   <tr>
-                    <td>Totals:</td>
+                    <td>Day Totals:</td>
                     <td>-</td>
                     <td>-</td>
                     <td id="archiveTotalLength">0.00</td>
@@ -1237,19 +1190,14 @@
                 </tfoot>
               </table>
             </div>
-            <div style="margin-top: 15px; text-align: center;">
-              <button id="exportArchiveButton" class="export-btn" style="background-color: var(--success);">Export Selected Day to CSV</button>
-            </div>
           </div>
         </div>
       </div>
       <!-- End of Data History Tab -->
 
-      <!-- 10. Paver Speed Calculator Tab -->
+      <!-- Paver Speed Calculator Tab -->
       <div class="tab-content" id="paverSpeedTab">
         <h2>Paver Speed Calculator</h2>
-        <!-- V = (R_p * L) / 60, where L = (2000/9) * W * A -->
-        <!-- Required Inputs: R_p, W, A -->
         <div class="flex-container">
           <div class="input-section">
             <div class="input-grid">
@@ -1273,17 +1221,15 @@
             <h3>Result</h3>
             <div class="result-row">
               <span class="result-label">Paver Speed:</span>
-              <span><span id="paverSpeedResult">-</span> feet/minute</span>
+              <span><span id="paverSpeedResult">-</span> ft/min</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 11. Projected Paving Length Calculator Tab -->
+      <!-- Projected Paving Length Calculator Tab -->
       <div class="tab-content" id="projLengthTab">
         <h2>Projected Paving Length Calculator</h2>
-        <!-- Projected Paving Length = ( Tons / ( (((LaneWidth*100)/9)*Yield) / 2000 ) ) * 100 -->
-        <!-- Required Inputs: Tons, LaneWidth, Yield -->
         <div class="flex-container">
           <div class="input-section">
             <div class="input-grid">
@@ -1313,10 +1259,9 @@
         </div>
       </div>
 
-      <!-- 12. Tonnage (HMA Usage) Calculator Tab -->
+      <!-- Tonnage (HMA Usage) Calculator Tab -->
       <div class="tab-content" id="tonnageTab">
         <h2>HMA Usage Calculator</h2>
-        <!-- Tons Used = ((Length * Width / 9) * 110 * Depth) / 2000 -->
         <div class="flex-container">
           <div class="input-section">
             <div class="input-grid">
@@ -1353,56 +1298,81 @@
   <!-- About Modal -->
   <div id="aboutModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1000;">
     <div class="archive-modal-content" style="max-height: 80vh; overflow-y: auto;">
-      <span id="closeAboutModal" class="archive-close">&times;</span>
-      <h2 style="color: var(--primary); margin-bottom: 15px;">About Asphalt Yield Calculator</h2>
-      
+      <span id="closeAboutModal" class="archive-close">×</span>
+      <!-- 4. App Name Update -->
+      <h2 style="color: var(--primary); margin-bottom: 15px;">About HMA Paving</h2>
+
       <div style="margin-bottom: 20px;">
         <h3 style="color: var(--secondary); margin-bottom: 10px;">Overview</h3>
-        <p style="margin-bottom: 10px;">The Asphalt Yield Calculator is a specialized tool designed for asphalt paving professionals to calculate and track material usage, paving speed, projected lengths, and tonnage requirements.</p>
+        <p style="margin-bottom: 10px;">The HMA Paving app is a specialized tool designed for asphalt paving professionals to calculate and track material usage, paving speed, projected lengths, and tonnage requirements across different runs within a day.</p>
       </div>
-      
+
       <div style="margin-bottom: 20px;">
         <h3 style="color: var(--secondary); margin-bottom: 10px;">How to Use</h3>
-        
-        <h4 style="margin-top: 15px; margin-bottom: 5px;">Yield Calculator</h4>
+
+        <h4 style="margin-top: 15px; margin-bottom: 5px;">Yield Calculator (Main Screen)</h4>
         <ol style="padding-left: 20px; margin-bottom: 10px;">
-          <li>Enter the Load Number for identification</li>
-          <li>Input Truck Tonnage in tons</li>
-          <li>Enter Start and End Station values</li>
-          <li>Input Width in feet</li>
-          <li>The Length is calculated automatically</li>
-          <li>Click "Save Truck Data" to record the entry</li>
-          <li>View results in the Current Truck Results and Day Summary sections</li>
+          <li>Enter Load Number, Tonnage, Start/End Stations, and Width for each truck.</li>
+          <li>Length is calculated automatically.</li>
+          <li>Click "Save Truck Data" to record the entry for the current run.</li>
+          <li>Use the "Undo Last Save" button to remove the most recently saved truck entry.</li>
+          <li>View immediate results in "Current Truck Results".</li>
+          <li>View totals for the ongoing run in "Current Run Summary".</li>
+          <li>View totals for the entire calendar day in "Day Summary".</li>
+          <li>Click "Start New Run" when finishing a section or specific task. You'll be prompted for remarks for the completed run before the input fields clear for the next run. This archives the completed run's data.</li>
         </ol>
-        
-        <h4 style="margin-top: 15px; margin-bottom: 5px;">Data History</h4>
-        <p style="margin-bottom: 10px;">View all saved truck data for the current day, with totals at the bottom. Click "View Previous Days" to access archived data from past days.</p>
-        
+
+        <h4 style="margin-top: 15px; margin-bottom: 5px;">Current Run / History Tab</h4>
+        <ul style="padding-left: 20px; margin-bottom: 10px;">
+            <li>View all saved truck loads for the *current* run, with totals at the bottom.</li>
+            <li>Click "View Archived Runs" to access data from completed runs and previous days.</li>
+        </ul>
+
+        <h4 style="margin-top: 15px; margin-bottom: 5px;">Archived Runs Viewer</h4>
+        <ul style="padding-left: 20px; margin-bottom: 10px;">
+            <li>Select a date from the dropdown to view all runs completed on that calendar day.</li>
+            <li>Runs are separated visually, showing any remarks entered when "Start New Run" was clicked.</li>
+            <li>Totals for the entire selected day are shown at the bottom.</li>
+             <!-- 14. How to use the export feature -->
+            <li>Click "Export Day (Excel)" to download an Excel (.xlsx) file containing all data for the selected date.</li>
+        </ul>
+
+
         <h4 style="margin-top: 15px; margin-bottom: 5px;">Paver Speed Calculator</h4>
         <p style="margin-bottom: 10px;">Calculate optimal paver speed by entering Production Rate (tons/hour), Pavement Width (feet), and Application Rate (lbs/sq yd).</p>
-        
+
         <h4 style="margin-top: 15px; margin-bottom: 5px;">Projected Length Calculator</h4>
         <p style="margin-bottom: 10px;">Determine projected paving length based on Projected Daily Tons, Lane Width, and Application Rate.</p>
-        
+
         <h4 style="margin-top: 15px; margin-bottom: 5px;">Tonnage Calculator</h4>
-        <p style="margin-bottom: 10px;">Estimate the amount of HMA (Hot Mix Asphalt) needed based on Length, Width, and Depth measurements.</p>
-        
+        <!-- 5. About Section Text: Minor tweak -->
+        <p style="margin-bottom: 10px;">Estimate the usage of Hot Mix Asphalt (HMA) needed based on Length, Width, and Depth measurements.</p>
+
         <h4 style="margin-top: 15px; margin-bottom: 5px;">Data Management</h4>
         <ul style="padding-left: 20px; margin-bottom: 10px;">
-          <li>Click "Start New Day" to archive current data and begin a new day</li>
-          <li>Export data to CSV format for further analysis using the "Export All Data" option</li>
-          <li>All data is stored locally on your device</li>
+          <li>Clicking "Start New Run" archives the current run's data with optional remarks and resets the form.</li>
+          <li>Data for the entire calendar day remains summarised in the "Day Summary" section.</li>
+          <li>All data is stored locally on your device's browser storage. Clearing browser data will erase stored information.</li>
+          <li>Night paving shifts crossing midnight: The app currently resets the "Day Summary" at midnight based on the device clock. Data is archived by calendar day.</li>
+        </ul>
+
+         <!-- 14. Add Instructions: How to save the web app -->
+        <h4 style="margin-top: 15px; margin-bottom: 5px;">Add to Home Screen (Install App)</h4>
+        <p style="margin-bottom: 5px;">You can add this web app to your phone's home screen for easy access, like a native app:</p>
+        <ul style="padding-left: 20px; margin-bottom: 10px;">
+            <li><strong>iOS (Safari):</strong> Tap the Share button (square with arrow pointing up), then scroll down and tap "Add to Home Screen".</li>
+            <li><strong>Android (Chrome):</strong> Tap the three-dot menu button, then tap "Install app" or "Add to Home screen".</li>
         </ul>
       </div>
-      
+
       <div style="margin-bottom: 20px;">
         <h3 style="color: var(--secondary); margin-bottom: 10px;">Author Information</h3>
         <p>Created by: Mark Heinonen</p>
-        <p>Version: 1.1.0</p>
+        <p>Version: 1.2.0</p>
         <p>Contact: heinonenmh@gmail.com</p>
-        <button id="reportBugButton" onclick="window.location.href='mailto:heinonenmh@gmail.com?subject=Bug Report: Asphalt Yield Calculator'" style="background-color: var(--secondary); color: white; padding: 6px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Report a Bug</button>
+        <button id="reportBugButton" onclick="window.location.href='mailto:heinonenmh@gmail.com?subject=Bug Report: HMA Paving App'" style="background-color: var(--secondary); color: white; padding: 6px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Report a Bug</button>
       </div>
-      
+
       <div style="text-align: center; margin-top: 20px;">
         <button id="closeAboutButton" style="background-color: var(--primary); color: white; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer;">Close</button>
       </div>
@@ -1413,125 +1383,72 @@
     /***********************************************************
      * Data and State
      ***********************************************************/
-    // Where we store the yield-calculator truck data (core feature).
-    let dailyData = [];
+    // Data for the current run (since last 'Start New Run')
+    let currentRunData = [];
+    // Data for the entire current calendar day
+    let calendarDayData = [];
+    // State for undo functionality
+    let lastAction = { type: null, data: null }; // type: 'add', 'delete'
+    // Holds data loaded for display in archive modal
+    let currentArchiveDisplayData = [];
+
     let lastEndValue = null;
     let lastWidth = null;
-    let currentDate = new Date().toISOString().split('T')[0]; // Current date in YYYY-MM-DD format
+    let currentDate = getTodayDate(); // Current date in YYYY-MM-DD format
 
     // Constants
     const TONS_TO_POUNDS = 2000;
     const SQ_FT_TO_SQ_YD = 9;
 
-    // Prevent scrolling and zooming on mobile
-    document.addEventListener('touchmove', function(event) {
-      if (event.scale !== 1) {
-        event.preventDefault();
-      }
-    }, { passive: false });
-    
-    // Prevent double-tap to zoom
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', function(event) {
-      const now = (new Date()).getTime();
-      if (now - lastTouchEnd <= 300) {
-        event.preventDefault();
-      }
-      lastTouchEnd = now;
-    }, { passive: false });
-    
-    // Prevent default touchstart behavior for specific elements
-    document.addEventListener('touchstart', function(event) {
-      // Allow scrolling only inside elements with overflow
-      if (!event.target.closest('.container, .data-table-container, .archive-modal-content')) {
-        event.preventDefault();
-      }
-    }, { passive: false });
+    // Local Storage Keys
+    const CURRENT_RUN_DATA_KEY = 'hmaPaving_currentRunData';
+    const CALENDAR_DATA_PREFIX = 'hmaPaving_calendarData_';
+    const ARCHIVES_KEY = 'hmaPaving_archives';
+    const LAST_SAVED_DATE_KEY = 'hmaPaving_lastSavedDate';
+    const LAST_END_VALUE_KEY = 'hmaPaving_lastEndValue';
+    const LAST_WIDTH_KEY = 'hmaPaving_lastWidth';
+    const THEME_KEY = 'hmaPaving_theme';
 
-    // Enforce numeric input validation for all number input fields
-    document.addEventListener('DOMContentLoaded', function() {
-      // Get all number input fields
-      const numericInputs = document.querySelectorAll('input[type="number"]');
-      
-      // Add input validation to each numeric field
-      numericInputs.forEach(input => {
-        // Prevent non-numeric key presses
-        input.addEventListener('keypress', function(e) {
-          // Allow: backspace, delete, tab, escape, enter, decimal point, and numbers
-          const charCode = (e.which) ? e.which : e.keyCode;
-          
-          // Allow decimal point
-          if (charCode === 46 && this.value.indexOf('.') !== -1) {
-            e.preventDefault();
-            return false;
-          }
-          
-          // Allow numbers and decimal point only
-          if (charCode !== 46 && (charCode < 48 || charCode > 57)) {
-            e.preventDefault();
-            return false;
-          }
-          
-          // If zero is the first digit, ensure next character is a decimal point
-          if (this.value === '0' && charCode !== 46 && this.selectionStart === 1) {
-            this.value = '0.';
-            this.selectionStart = 2;
-            this.selectionEnd = 2;
-            e.preventDefault();
-            return false;
-          }
-          
-          return true;
-        });
-        
-        // Handle paste events to ensure only valid numeric data
-        input.addEventListener('paste', function(e) {
-          const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-          if (!/^-?\d*\.?\d*$/.test(pastedText)) {
-            e.preventDefault();
-          }
-        });
-        
-        // Check min value on blur
-        input.addEventListener('blur', function() {
-          if (this.value !== '') {
-            const min = parseFloat(this.min);
-            const value = parseFloat(this.value);
-            
-            if (!isNaN(min) && !isNaN(value) && value < min) {
-              this.value = min;
-            }
-          }
-        });
-      });
-    });
 
-    // DOM Elements
+    /***********************************************************
+     * DOM Elements
+     ***********************************************************/
+    // Date Display
     const currentDateDisplay = document.getElementById('currentDateDisplay');
+    // Input Fields
     const truckNumberInput = document.getElementById('truckNumber');
     const truckTonnageInput = document.getElementById('truckTonnage');
     const startValueInput = document.getElementById('startValue');
     const endValueInput = document.getElementById('endValue');
     const widthInput = document.getElementById('width');
     const calculatedLengthInput = document.getElementById('calculatedLength');
+    // Buttons
     const saveTruckButton = document.getElementById('saveTruckButton');
-    const exportAllDataButton = document.getElementById('exportAllDataButton');
-    const resetButton = document.getElementById('resetButton');
+    const startNewRunButton = document.getElementById('startNewRunButton'); // Renamed ID
+    const undoButton = document.getElementById('undoButton');
+    // Current Truck Results Display
     const areaResult = document.getElementById('areaResult');
     const weightResult = document.getElementById('weightResult');
     const yieldResult = document.getElementById('yieldResult');
-    const totalTrucks = document.getElementById('totalTrucks');
-    const totalArea = document.getElementById('totalArea');
-    const totalWeight = document.getElementById('totalWeight');
-    const averageYield = document.getElementById('averageYield');
+    // Current Run Summary Display
+    const runTotalTrucks = document.getElementById('runTotalTrucks');
+    const runTotalArea = document.getElementById('runTotalArea');
+    const runTotalWeight = document.getElementById('runTotalWeight');
+    const runAverageYield = document.getElementById('runAverageYield');
+    // Day Summary Display
+    const dayTotalTrucks = document.getElementById('dayTotalTrucks'); // Renamed ID
+    const dayTotalArea = document.getElementById('dayTotalArea');     // Renamed ID
+    const dayTotalWeight = document.getElementById('dayTotalWeight');   // Renamed ID
+    const dayAverageYield = document.getElementById('dayAverageYield'); // Renamed ID
+    // Current Run Data Table (in Data History Tab)
     const truckDataBody = document.getElementById('truckDataBody');
-    const totalLength = document.getElementById('totalLength');
-    const totalAreaFoot = document.getElementById('totalAreaFoot');
-    const totalTonnageFoot = document.getElementById('totalTonnageFoot');
-    const totalWeightFoot = document.getElementById('totalWeightFoot');
-    const avgYieldFoot = document.getElementById('avgYieldFoot');
-    
-    // Archive DOM Elements
+    const runTotalLengthFoot = document.getElementById('runTotalLengthFoot'); // Renamed ID
+    const runTotalAreaFoot = document.getElementById('runTotalAreaFoot');     // Renamed ID
+    const runTotalTonnageFoot = document.getElementById('runTotalTonnageFoot'); // Renamed ID
+    const runTotalWeightFoot = document.getElementById('runTotalWeightFoot');   // Renamed ID
+    const runAvgYieldFoot = document.getElementById('runAvgYieldFoot');       // Renamed ID
+
+    // Archive Modal Elements
     const viewArchivesButton = document.getElementById('viewArchivesButton');
     const archiveModal = document.getElementById('archiveModal');
     const closeArchiveModal = document.getElementById('closeArchiveModal');
@@ -1542,389 +1459,313 @@
     const archiveTotalTonnageFoot = document.getElementById('archiveTotalTonnageFoot');
     const archiveTotalWeightFoot = document.getElementById('archiveTotalWeightFoot');
     const archiveAvgYieldFoot = document.getElementById('archiveAvgYieldFoot');
-    const exportArchiveButton = document.getElementById('exportArchiveButton');
-    
-    // About Modal DOM Elements
+    const exportArchiveButton = document.getElementById('exportArchiveButton'); // Renamed ID
+
+    // About Modal Elements
     const aboutButton = document.getElementById('aboutButton');
     const aboutModal = document.getElementById('aboutModal');
     const closeAboutModal = document.getElementById('closeAboutModal');
     const closeAboutButton = document.getElementById('closeAboutButton');
-    
+
     // Additional Calculators' DOM references
     const paverProdRate = document.getElementById('paverProdRate');
     const paverWidth = document.getElementById('paverWidth');
     const paverYield = document.getElementById('paverYield');
     const paverSpeedResult = document.getElementById('paverSpeedResult');
-
     const projTons = document.getElementById('projTons');
     const projLaneWidth = document.getElementById('projLaneWidth');
     const projYield = document.getElementById('projYield');
     const projLengthResult = document.getElementById('projLengthResult');
-
     const tonLength = document.getElementById('tonLength');
     const tonWidth = document.getElementById('tonWidth');
     const tonDepth = document.getElementById('tonDepth');
     const tonCalcResult = document.getElementById('tonCalcResult');
 
+    // Hamburger Menu Elements
+    const hamburgerIcon = document.querySelector('.hamburger-icon');
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.querySelector('.overlay');
+    const menuItems = document.querySelectorAll('.sidebar-menu li'); // Re-query after potential DOM changes
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const darkModeSwitch = document.getElementById('darkModeSwitch');
+    const exportDataButton = document.getElementById('exportDataButton');
+
+
     /***********************************************************
-     * Initialization
+     * Initialization & Event Listeners
      ***********************************************************/
-    // Format and display current date
-    function formatDateForDisplay(dateString) {
-      let date;
-      
-      if (dateString) {
-        // If dateString is provided, parse it correctly
-        // Split by hyphens and create a new date in local time (month is 0-indexed in Date constructor)
-        const parts = dateString.split('-');
-        if (parts.length === 3) {
-          date = new Date(parts[0], parts[1]-1, parts[2]);
-        } else {
-          date = new Date(); // Fallback to today
-        }
-      } else {
-        date = new Date(); // No dateString provided, use today
-      }
-      
-      const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
-      return date.toLocaleDateString('en-US', options);
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM Content Loaded");
+        // Prevent scrolling and zooming
+        setupTouchControls();
+        // Validate numeric inputs
+        setupNumericInputValidation();
+        // Load theme first
+        initTheme();
+        // Load data and set up UI
+        initializeAppData();
+        // Setup event listeners
+        setupEventListeners();
+        // Initial UI update
+        updateAllUI();
+    });
+
+    function initializeAppData() {
+        console.log("Initializing App Data...");
+        checkDateChangeAndLoadData(); // Handles loading based on date change
+        updateDateDisplay();
+        // Initial calculation/state check
+        updateLength();
+        calculateYield();
+        console.log("App Data Initialized. Current Date:", currentDate);
     }
-    
-    // Get today's date using local time zone - more reliable method
+
+    function setupEventListeners() {
+        console.log("Setting up Event Listeners...");
+        // Input listeners for real-time calculation
+        [startValueInput, endValueInput, widthInput, truckTonnageInput].forEach(el => {
+            el.addEventListener('input', () => {
+                updateLength();
+                calculateYield();
+            });
+        });
+        truckNumberInput.addEventListener('input', checkSaveButtonState);
+
+        // Button listeners
+        saveTruckButton.addEventListener('click', saveTruckData);
+        startNewRunButton.addEventListener('click', startNewRun); // Use renamed button/function
+        undoButton.addEventListener('click', undoLastAction);
+
+        // Archive listeners
+        viewArchivesButton.addEventListener('click', openArchiveModal);
+        closeArchiveModal.addEventListener('click', closeArchiveModalFunc);
+        archiveDateSelect.addEventListener('change', loadArchiveDataForSelectedDate); // Renamed handler
+        exportArchiveButton.addEventListener('click', exportArchiveToExcel); // Use renamed function
+
+        // About modal listeners
+        aboutButton.addEventListener('click', openAboutModal);
+        closeAboutModal.addEventListener('click', closeAboutModalFunc);
+        closeAboutButton.addEventListener('click', closeAboutModalFunc);
+        
+        // Export data button listener
+        exportDataButton.addEventListener('click', exportTodayDataToExcel);
+
+        // Modal closing on background click
+        window.addEventListener('click', function(event) {
+            if (event.target == archiveModal) closeArchiveModalFunc();
+            if (event.target == aboutModal) closeAboutModalFunc();
+        });
+        document.querySelector('#archiveModal > .archive-modal-content').addEventListener('click', e => e.stopPropagation());
+        document.querySelector('#aboutModal > .archive-modal-content').addEventListener('click', e => e.stopPropagation());
+
+
+        // Additional Calculator listeners
+        [paverProdRate, paverWidth, paverYield].forEach(el => el.addEventListener('input', calculatePaverSpeed));
+        [projTons, projLaneWidth, projYield].forEach(el => el.addEventListener('input', calculateProjectedLength));
+        [tonLength, tonWidth, tonDepth].forEach(el => el.addEventListener('input', calculateTonnageUsed));
+
+        // Hamburger/Sidebar listeners
+        setupSidebarMenu();
+
+        // Save data on page unload
+        window.addEventListener('beforeunload', saveData); // Simple save, archiving handled by date check/startNewRun
+        console.log("Event Listeners Setup Complete.");
+    }
+
+    function updateAllUI() {
+        console.log("Updating All UI components...");
+        updateDateDisplay();
+        updateCurrentRunTable(); // Renamed from updateTruckTable
+        updateCurrentRunSummary(); // New function for run summary box
+        updateDaySummary(); // Renamed from updateTotals
+        updateCurrentRunTableFooter(); // Renamed from updateFooterTotals
+        checkSaveButtonState();
+        checkUndoButtonState();
+        console.log("UI Update Complete.");
+    }
+
+    /***********************************************************
+     * Date & Data Loading / Saving / Archiving
+     ***********************************************************/
+
+    // Get today's date in YYYY-MM-DD format using local time zone
     function getTodayDate() {
-      // Use the Date constructor with specific components to ensure local date
       const now = new Date();
       const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0'); // getMonth() is 0-indexed
+      const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     }
-    
-    // Direct method to update date display with today's date
+
+    // Format date for display (e.g., "Wed, Sep 25, 2024")
+    function formatDateForDisplay(dateString) {
+        try {
+            // Handles YYYY-MM-DD format correctly regardless of timezone issues with Date constructor
+            const [year, month, day] = dateString.split('-').map(Number);
+            const date = new Date(year, month - 1, day); // Month is 0-indexed
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        } catch (e) {
+            console.error("Error formatting date:", dateString, e);
+            return dateString; // Fallback
+        }
+    }
+
+    // Update the date display in the header
     function updateDateDisplay() {
-      const today = new Date();
-      const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
-      const formattedDate = today.toLocaleDateString('en-US', options);
-      currentDateDisplay.textContent = formattedDate;
-    }
-    
-    // Always update to today's date on initial load
-    currentDate = getTodayDate();
-    // Force direct update of the date display
-    updateDateDisplay();
-    
-    // Clear any stored date to ensure fresh start
-    // localStorage.removeItem('asphaltYieldDate');
-    console.log("Today's date (YYYY-MM-DD):", currentDate);
-
-    loadData();
-    updateTruckTable();
-    updateTotals();
-
-    // Event Listeners (Real-Time Calculations)
-    [startValueInput, endValueInput, widthInput, truckTonnageInput].forEach(el => {
-      el.addEventListener('input', () => {
-        updateLength();
-        calculateYield();
-      });
-    });
-
-    truckNumberInput.addEventListener('input', () => {
-      // Enable "Save Truck Data" if there's a load number AND valid yield
-      const hasLoadNumber = truckNumberInput.value.trim() !== '';
-      const hasYield = yieldResult.textContent !== '-';
-      saveTruckButton.disabled = !(hasLoadNumber && hasYield);
-    });
-
-    // Save Truck Button
-    saveTruckButton.addEventListener('click', saveTruckData);
-
-    // Export All Data (fallback direct handler in case menu handling fails)
-    if (exportAllDataButton) {
-      exportAllDataButton.addEventListener('click', function() {
-        exportToCSV();
-      });
+      currentDateDisplay.textContent = formatDateForDisplay(currentDate);
     }
 
-    // Reset Day
-    resetButton.addEventListener('click', startNewDay);
+    // Check if the calendar date has changed, handle archiving, and load data
+    function checkDateChangeAndLoadData() {
+        console.log("Checking for date change...");
+        const todayDate = getTodayDate();
+        const savedDate = localStorage.getItem(LAST_SAVED_DATE_KEY);
+        console.log(`Today: ${todayDate}, Last Saved Date: ${savedDate}`);
 
-    // Tab Navigation
-    const tabButtons = document.querySelectorAll('.tab-button');
-    const tabContents = document.querySelectorAll('.tab-content');
-    tabButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        const tabId = button.getAttribute('data-tab');
-        tabButtons.forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-        tabContents.forEach(tc => tc.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-      });
-    });
+        // Determine the date to operate on
+        currentDate = savedDate || todayDate; // Use saved date if available, otherwise today
 
-    // Additional Calculators - Real-time event handlers
-    [paverProdRate, paverWidth, paverYield].forEach(el => el.addEventListener('input', calculatePaverSpeed));
-    [projTons, projLaneWidth, projYield].forEach(el => el.addEventListener('input', calculateProjectedLength));
-    [tonLength, tonWidth, tonDepth].forEach(el => el.addEventListener('input', calculateTonnageUsed));
+        if (savedDate && savedDate !== todayDate) {
+            console.log("Date change detected. Archiving previous day's data...");
+            // Archive data from the 'savedDate' if it exists
+            const prevCalendarData = loadDataFromStorage(CALENDAR_DATA_PREFIX + savedDate);
+            const prevRunData = loadDataFromStorage(CURRENT_RUN_DATA_KEY); // Assumes this belongs to savedDate
 
-    // Add event listeners for Archive functionality
-    viewArchivesButton.addEventListener('click', openArchiveModal);
-    closeArchiveModal.addEventListener('click', closeArchiveModalFunc);
-    archiveDateSelect.addEventListener('change', loadArchiveData);
-    exportArchiveButton.addEventListener('click', exportArchiveToCSV);
-    
-    // Close modal when clicking outside of it
-    window.addEventListener('click', function(event) {
-      if (event.target == archiveModal) {
-        closeArchiveModalFunc();
-      }
-    });
-    
-    // Prevent modal content clicks from closing the modal
-    document.querySelector('#archiveModal > div').addEventListener('click', function(event) {
-      event.stopPropagation();
-    });
-    
-    // Function to open the archive modal and load available dates
-    function openArchiveModal() {
-      // Load available dates
-      populateArchiveDates();
-      // Show the modal
-      archiveModal.style.display = 'block';
-      
-      // Check if we have any archives to show
-      const archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-      const dates = Object.keys(archives);
-      
-      if (dates.length === 0) {
-        alert('No archived data available yet. Data is archived when you start a new day or close the app with saved data.');
-        closeArchiveModalFunc();
-      }
-    }
-    
-    // Function to close the archive modal
-    function closeArchiveModalFunc() {
-      archiveModal.style.display = 'none';
-    }
-    
-    // Function to populate the archive dates dropdown
-    function populateArchiveDates() {
-      // Clear existing options except the first one
-      while (archiveDateSelect.options.length > 1) {
-        archiveDateSelect.remove(1);
-      }
-      
-      // Get archives from localStorage
-      const archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-      
-      // Sort dates in reverse chronological order (newest first)
-      // Special handling for keys with timestamps
-      const dates = Object.keys(archives).sort((a, b) => {
-        // Extract base dates (without timestamps)
-        const dateA = a.split('_')[0];
-        const dateB = b.split('_')[0];
-        
-        // If base dates are the same, sort by the full key (including timestamp) in reverse
-        if (dateA === dateB) {
-          return b.localeCompare(a); // Newer timestamps first
-        }
-        
-        // Otherwise sort by base date in reverse chronological order
-        return new Date(dateB) - new Date(dateA);
-      });
-      
-      // Add options for each date
-      dates.forEach(date => {
-        const option = document.createElement('option');
-        option.value = date;
-        
-        // Check if this is a timestamped archive (same-day reset)
-        if (date.includes('_')) {
-          const [baseDate, timestamp] = date.split('_');
-          const formattedBaseDate = formatDateForDisplay(baseDate);
-          // Extract time from timestamp (format: YYYY-MM-DDThh-mm-ss-mmmZ)
-          const timeMatch = timestamp.match(/T(\d+)-(\d+)-(\d+)/);
-          let timeString = '';
-          
-          if (timeMatch && timeMatch.length >= 4) {
-            const hours = parseInt(timeMatch[1]);
-            const minutes = timeMatch[2];
-            // Format as AM/PM
-            const period = hours >= 12 ? 'PM' : 'AM';
-            const displayHours = hours % 12 || 12; // Convert 0 to 12 for 12-hour format
-            timeString = ` (${displayHours}:${minutes} ${period})`;
-          }
-          
-          option.textContent = `${formattedBaseDate}${timeString} - Reset`;
+             // Archive calendar data (optional, could just rely on run archives)
+             // archiveFullDayData(savedDate, prevCalendarData);
+
+            // Archive the last run data of the previous day if not empty
+            if (prevRunData && prevRunData.length > 0) {
+                console.log(`Archiving last run of ${savedDate}...`);
+                // Provide default remarks or consider prompting if critical
+                archiveRunData(savedDate, prevRunData, "Auto-archived due to date change");
+            }
+
+            // Clear data for the new day
+            calendarDayData = [];
+            currentRunData = [];
+            lastEndValue = null; // Reset carry-over values for a new day
+            lastWidth = null;
+            localStorage.removeItem(LAST_END_VALUE_KEY);
+            localStorage.removeItem(LAST_WIDTH_KEY);
+            currentDate = todayDate; // Set current date to today
+             console.log("Data cleared for new day:", todayDate);
         } else {
-          option.textContent = formatDateForDisplay(date);
+            console.log("Loading data for date:", currentDate);
+            // Load data for the current date
+            calendarDayData = loadDataFromStorage(CALENDAR_DATA_PREFIX + currentDate) || [];
+            currentRunData = loadDataFromStorage(CURRENT_RUN_DATA_KEY) || []; // Load potentially ongoing run
+            lastEndValue = parseFloat(localStorage.getItem(LAST_END_VALUE_KEY)) || null;
+            lastWidth = parseFloat(localStorage.getItem(LAST_WIDTH_KEY)) || null;
+
+            // Restore input fields if applicable
+            if (lastEndValue !== null) startValueInput.value = lastEndValue.toFixed(2);
+            if (lastWidth !== null) widthInput.value = lastWidth.toFixed(2);
+            console.log(`Loaded ${calendarDayData.length} calendar entries and ${currentRunData.length} run entries for ${currentDate}.`);
         }
-        
-        archiveDateSelect.appendChild(option);
-      });
-      
-      // Clear archive table
-      archiveDataBody.innerHTML = '';
-      updateArchiveFooterTotals([]);
+
+        // Always save the current date as the last saved date
+        localStorage.setItem(LAST_SAVED_DATE_KEY, currentDate);
+        updateDateDisplay(); // Ensure display matches loaded/current date
     }
-    
-    // Function to load archive data for selected date
-    function loadArchiveData() {
-      const selectedDate = archiveDateSelect.value;
-      
-      if (!selectedDate) {
-        archiveDataBody.innerHTML = '';
-        updateArchiveFooterTotals([]);
-        return;
-      }
-      
-      // Get archives from localStorage
-      const archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-      const archiveData = archives[selectedDate] || [];
-      
-      // Update the archive table
-      archiveDataBody.innerHTML = '';
-      
-      // Add note for same-day resets at the top of the table
-      if (selectedDate.includes('_')) {
-        const noteRow = document.createElement('tr');
-        noteRow.className = 'archive-note-row';
-        
-        // Extract time from the timestamp for a user-friendly message
-        const [baseDate, timestamp] = selectedDate.split('_');
-        const timeMatch = timestamp.match(/T(\d+)-(\d+)/);
-        let timeString = '';
-        
-        if (timeMatch && timeMatch.length >= 3) {
-          const hours = parseInt(timeMatch[1]);
-          const minutes = timeMatch[2];
-          const period = hours >= 12 ? 'PM' : 'AM';
-          const displayHours = hours % 12 || 12;
-          timeString = `${displayHours}:${minutes} ${period}`;
+
+    // Helper to load and parse JSON from localStorage
+    function loadDataFromStorage(key) {
+        const data = localStorage.getItem(key);
+        if (data) {
+            try {
+                return JSON.parse(data);
+            } catch (err) {
+                console.error(`Error parsing data from key "${key}":`, err);
+                localStorage.removeItem(key); // Remove corrupted data
+                return null;
+            }
         }
-        
-        // Create a note that spans all columns
-        const noteCell = document.createElement('td');
-        noteCell.colSpan = 10; // Span all columns in the table
-        noteCell.innerHTML = `<strong>Note:</strong> This is a mid-day reset data set (reset at ${timeString}).`;
-        noteCell.style.backgroundColor = '#ffffc0'; // Light yellow background
-        noteCell.style.textAlign = 'center';
-        noteRow.appendChild(noteCell);
-        archiveDataBody.appendChild(noteRow);
-      }
-      
-      archiveData.forEach(truck => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${truck.loadNumber || ''}</td>
-          <td>${(truck.startValue ?? 0).toFixed(2)}</td>
-          <td>${(truck.endValue ?? 0).toFixed(2)}</td>
-          <td>${(truck.length ?? 0).toFixed(2)}</td>
-          <td>${(truck.width ?? 0).toFixed(2)}</td>
-          <td>${(truck.area ?? 0).toFixed(2)}</td>
-          <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
-          <td>${(truck.weight ?? 0).toFixed(2)}</td>
-          <td>${(truck.yield ?? 0).toFixed(2)}</td>
-          <td>${truck.date || ''}</td>
-        `;
-        archiveDataBody.appendChild(row);
-      });
-      
-      // Update the footer totals
-      updateArchiveFooterTotals(archiveData);
+        return null;
     }
-    
-    // Function to update archive footer totals
-    function updateArchiveFooterTotals(data) {
-      const totalLengthValue = data.reduce((sum, t) => sum + (t.length || 0), 0);
-      const totalAreaValue = data.reduce((sum, t) => sum + (t.area || 0), 0);
-      const totalTonnageValue = data.reduce((sum, t) => sum + (t.tonnage || 0), 0);
-      const totalWeightValue = data.reduce((sum, t) => sum + (t.weight || 0), 0);
-      const avgYieldValue = (totalAreaValue > 0) ? (totalWeightValue / totalAreaValue) : 0;
-      
-      archiveTotalLength.textContent = totalLengthValue.toFixed(2);
-      archiveTotalAreaFoot.textContent = totalAreaValue.toFixed(2);
-      archiveTotalTonnageFoot.textContent = totalTonnageValue.toFixed(2);
-      archiveTotalWeightFoot.textContent = totalWeightValue.toFixed(2);
-      archiveAvgYieldFoot.textContent = avgYieldValue.toFixed(2);
+
+    // Save all relevant data to localStorage
+    function saveData() {
+        try {
+            localStorage.setItem(CURRENT_RUN_DATA_KEY, JSON.stringify(currentRunData));
+            localStorage.setItem(CALENDAR_DATA_PREFIX + currentDate, JSON.stringify(calendarDayData));
+            localStorage.setItem(LAST_SAVED_DATE_KEY, currentDate);
+            if (lastEndValue !== null) localStorage.setItem(LAST_END_VALUE_KEY, lastEndValue.toString());
+            else localStorage.removeItem(LAST_END_VALUE_KEY);
+            if (lastWidth !== null) localStorage.setItem(LAST_WIDTH_KEY, lastWidth.toString());
+            else localStorage.removeItem(LAST_WIDTH_KEY);
+            // console.log(`Data saved for ${currentDate}. Run: ${currentRunData.length}, Day: ${calendarDayData.length}`);
+        } catch (error) {
+            console.error("Error saving data to localStorage:", error);
+            alert("Error saving data. Local storage might be full or unavailable.");
+        }
     }
-    
-    // Function to export archive data to CSV
-    function exportArchiveToCSV() {
-      const selectedDate = archiveDateSelect.value;
-      
-      if (!selectedDate) {
-        alert('Please select a date to export');
-        return;
-      }
-      
-      // Get archives from localStorage
-      const archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-      const archiveData = archives[selectedDate] || [];
-      
-      if (archiveData.length === 0) {
-        alert('No data to export for selected date');
-        return;
-      }
-      
-      let csvContent = 'Date,Load Number,Start Sta.,End Sta.,Length (ft),Width (ft),Area (sq yd),Tonnage (tons),Weight (lbs),Yield (lbs/sq yd)\n';
-      
-      archiveData.forEach(item => {
-        const row = [
-          item.date || '',
-          item.loadNumber || '',
-          (item.startValue ?? 0).toFixed(2),
-          (item.endValue ?? 0).toFixed(2),
-          (item.length ?? 0).toFixed(2),
-          (item.width ?? 0).toFixed(2),
-          (item.area ?? 0).toFixed(2),
-          (item.tonnage ?? 0).toFixed(2),
-          (item.weight ?? 0).toFixed(2),
-          (item.yield ?? 0).toFixed(2)
-        ].join(',');
-        csvContent += row + '\n';
-      });
-      
-      // Add totals row at the end
-      const totalLengthValue = archiveData.reduce((sum, t) => sum + (t.length || 0), 0);
-      const totalAreaValue = archiveData.reduce((sum, t) => sum + (t.area || 0), 0);
-      const totalTonnageValue = archiveData.reduce((sum, t) => sum + (t.tonnage || 0), 0);
-      const totalWeightValue = archiveData.reduce((sum, t) => sum + (t.weight || 0), 0);
-      const avgYieldValue = totalAreaValue > 0 ? totalWeightValue / totalAreaValue : 0;
-      
-      csvContent += [
-        'TOTALS',
-        '',
-        '',
-        '',
-        totalLengthValue.toFixed(2),
-        '',
-        totalAreaValue.toFixed(2),
-        totalTonnageValue.toFixed(2),
-        totalWeightValue.toFixed(2),
-        avgYieldValue.toFixed(2)
-      ].join(',') + '\n';
-      
-      const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      
-      // Create appropriate filename based on selected date
-      let filenameDatePart;
-      if (selectedDate.includes('_')) {
-        // For timestamped dates (same-day resets), use a more descriptive name
-        const [baseDate, timestamp] = selectedDate.split('_');
-        // Replace any remaining special chars to make a valid filename
-        const safeTimestamp = timestamp.replace(/[^\w-]/g, '-');
-        filenameDatePart = `${baseDate}_reset_${safeTimestamp}`;
+
+     // Archives the provided run data under the specified date
+    function archiveRunData(date, runData, remarks) {
+        if (!runData || runData.length === 0) {
+            console.log("No run data to archive for", date);
+            return;
+        }
+        try {
+            let archives = loadDataFromStorage(ARCHIVES_KEY) || {};
+            if (!archives[date]) {
+                archives[date] = [];
+            }
+
+            const runArchive = {
+                runId: new Date().toISOString(), // Unique ID for the run
+                data: runData,
+                remarks: remarks || "N/A" // Ensure remarks are always present
+            };
+
+            archives[date].push(runArchive);
+            localStorage.setItem(ARCHIVES_KEY, JSON.stringify(archives));
+            console.log(`Archived run with ${runData.length} entries for ${date}. Remarks: ${remarks}`);
+        } catch (error) {
+            console.error("Error archiving run data:", error);
+        }
+    }
+
+
+    // Action triggered by "Start New Run" button
+    function startNewRun() {
+      // 2. "Start New Run" Action: Prompt for Remarks (Mandatory)
+      let remarks = "";
+      if (currentRunData.length > 0) { // Only prompt if there's data to archive
+          remarks = prompt(`Enter remarks for the run just completed (Load ${currentRunData[0]?.loadNumber || '?'} to ${currentRunData[currentRunData.length-1]?.loadNumber || '?'}). Enter "N/A" if none.`);
+          while (!remarks) { // Loop until non-empty input is provided
+              alert("Remarks are mandatory. Please enter remarks or 'N/A'.");
+              remarks = prompt(`Enter remarks for the run just completed (Load ${currentRunData[0]?.loadNumber || '?'} to ${currentRunData[currentRunData.length-1]?.loadNumber || '?'}). Enter "N/A" if none.`);
+          }
+           // Archive the current run data with remarks
+          archiveRunData(currentDate, [...currentRunData], remarks); // Pass a copy
       } else {
-        filenameDatePart = selectedDate;
+          console.log("Start New Run clicked, but no data in the current run to archive.");
+          if (!confirm("Current run is empty. Start a new run anyway (clears form)?")) {
+              return; // User cancelled
+          }
       }
-      
-      link.setAttribute('download', `yield_data_${filenameDatePart}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+
+      // 2. "Start New Run" Action: Clear current run data and reset form
+      currentRunData = [];
+      lastEndValue = null; // Clear carry-over values for a new run *within the same day*
+      lastWidth = null;
+      resetFormForNextTruck();
+
+      // Update UI
+      updateAllUI(); // Update tables, summaries, etc.
+
+      // Save the cleared state
+      saveData();
+
+      // Clear last action for undo
+      lastAction = { type: null, data: null };
+      checkUndoButtonState();
+
+      console.log("New run started on", currentDate);
     }
 
     /***********************************************************
@@ -1933,11 +1774,7 @@
     function updateLength() {
       const startValue = parseFloat(startValueInput.value) || 0;
       const endValue = parseFloat(endValueInput.value) || 0;
-      if (startValue && endValue) {
-        calculatedLengthInput.value = Math.abs(endValue - startValue).toFixed(2);
-      } else {
-        calculatedLengthInput.value = '';
-      }
+      calculatedLengthInput.value = (startValue > 0 && endValue > 0) ? Math.abs(endValue - startValue).toFixed(2) : '';
     }
 
     function calculateYield() {
@@ -1949,35 +1786,31 @@
         areaResult.textContent = '-';
         weightResult.textContent = '-';
         yieldResult.textContent = '-';
-        saveTruckButton.disabled = true;
+        checkSaveButtonState(); // Disable save if yield is invalid
         return;
       }
 
-      // Area in sq yards
       const areaInSqFt = length * width;
       const areaInSqYd = areaInSqFt / SQ_FT_TO_SQ_YD;
-
-      // Convert tonnage to pounds
       const weightInPounds = tonnage * TONS_TO_POUNDS;
+      const yieldVal = areaInSqYd > 0 ? (weightInPounds / areaInSqYd) : 0;
 
-      // Calculate yield
-      const yieldVal = weightInPounds / areaInSqYd;
-
-      // Update UI
       areaResult.textContent = areaInSqYd.toFixed(2);
       weightResult.textContent = weightInPounds.toFixed(2);
       yieldResult.textContent = yieldVal.toFixed(2);
 
-      // Enable save button if load number present
-      const hasLoadNumber = truckNumberInput.value.trim() !== '';
-      saveTruckButton.disabled = !hasLoadNumber;
+      checkSaveButtonState(); // Check if save can be enabled
     }
 
+    function checkSaveButtonState() {
+        const hasLoadNumber = truckNumberInput.value.trim() !== '';
+        const hasValidYield = yieldResult.textContent !== '-' && parseFloat(yieldResult.textContent) > 0;
+        saveTruckButton.disabled = !(hasLoadNumber && hasValidYield);
+    }
+
+
     function saveTruckData() {
-      if (!truckNumberInput.value.trim()) {
-        alert('Please enter a Load Number');
-        return;
-      }
+      if (saveTruckButton.disabled) return; // Prevent saving if button is disabled
 
       saveTruckButton.disabled = true;
       saveTruckButton.innerHTML = 'Saving... <div class="loader"></div>';
@@ -1992,9 +1825,8 @@
       const weightVal = parseFloat(weightResult.textContent) || 0;
       const yieldVal = parseFloat(yieldResult.textContent) || 0;
 
-      // Build record
       const truckData = {
-        id: Date.now().toString(),
+        id: Date.now().toString(), // Unique ID for the entry
         loadNumber,
         startValue: startVal,
         endValue: endVal,
@@ -2004,762 +1836,818 @@
         tonnage: tonnageVal,
         weight: weightVal,
         yield: yieldVal,
-        date: currentDate // use current date
+        date: currentDate // Use current app date
       };
 
-      // 5. Auto-transfer of last End Sta. => next Start Sta.
+      // Add to both current run and calendar day data
+      currentRunData.push(truckData);
+      calendarDayData.push(truckData);
+
+      // Update last values for auto-population
       lastEndValue = endVal;
       lastWidth = widthVal;
 
-      dailyData.push(truckData);
-      saveData();         // Persist to localStorage
-      updateTruckTable(); // Refresh the table
-      updateTotals();     // Update summary info
+      // Set last action for undo
+      lastAction = { type: 'add', data: { ...truckData } }; // Store a copy
 
-      // Reset for next truck, except auto-populated fields
+      // Save data, update UI, reset form
+      saveData();
+      updateAllUI();
       resetFormForNextTruck();
 
-      saveTruckButton.innerHTML = 'Save Truck Data';
+      saveTruckButton.innerHTML = 'Save Truck Data'; // Restore button text
       truckNumberInput.focus();
     }
 
     function resetFormForNextTruck() {
       truckNumberInput.value = '';
       truckTonnageInput.value = '';
-      if (lastEndValue !== null) {
-        startValueInput.value = lastEndValue.toFixed(2);
-      } else {
-        startValueInput.value = '';
-      }
+      startValueInput.value = (lastEndValue !== null) ? lastEndValue.toFixed(2) : '';
       endValueInput.value = '';
+      // Only auto-fill width if it wasn't manually cleared
       if (lastWidth !== null && widthInput.value === '') {
-        widthInput.value = lastWidth.toFixed(2);
+          widthInput.value = lastWidth.toFixed(2);
+      } else if (lastWidth !== null && widthInput.value !== lastWidth.toFixed(2)) {
+          // If user changed width manually, don't overwrite, but clear lastWidth carryover
+          lastWidth = null;
+          localStorage.removeItem(LAST_WIDTH_KEY);
       }
       calculatedLengthInput.value = '';
       areaResult.textContent = '-';
       weightResult.textContent = '-';
       yieldResult.textContent = '-';
-      saveTruckButton.disabled = true;
-    }
-
-    function updateTruckTable() {
-      truckDataBody.innerHTML = '';
-
-      dailyData.forEach(truck => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${truck.loadNumber || ''}</td>
-          <td>${(truck.startValue ?? 0).toFixed(2)}</td>
-          <td>${(truck.endValue ?? 0).toFixed(2)}</td>
-          <td>${(truck.length ?? 0).toFixed(2)}</td>
-          <td>${(truck.width ?? 0).toFixed(2)}</td>
-          <td>${(truck.area ?? 0).toFixed(2)}</td>
-          <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
-          <td>${(truck.weight ?? 0).toFixed(2)}</td>
-          <td>${(truck.yield ?? 0).toFixed(2)}</td>
-          <!-- 2. No Time column -->
-          <td>${truck.date || ''}</td>
-          <td><span class="delete-btn" data-id="${truck.id}">✖</span></td>
-        `;
-        truckDataBody.appendChild(row);
-      });
-
-      // Delete handlers
-      document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-id');
-          if (id) deleteEntry(id);
-        });
-      });
-
-      // Update table footer
-      updateFooterTotals();
+      checkSaveButtonState(); // Should disable save button
+      updateLength(); // Recalculate length based on new start value
+      calculateYield(); // Recalculate yield based on cleared fields
     }
 
     function deleteEntry(id) {
-      const idx = dailyData.findIndex(t => t.id === id);
-      if (idx === -1) return;
-      const truck = dailyData[idx];
-      if (confirm(`Delete entry for Load ${truck.loadNumber}?`)) {
-        dailyData.splice(idx, 1);
-        saveData();
-        updateTruckTable();
-        updateTotals();
-      }
-    }
+        const runIndex = currentRunData.findIndex(t => t.id === id);
+        const dayIndex = calendarDayData.findIndex(t => t.id === id);
 
-    function updateFooterTotals() {
-      const totalLengthValue = dailyData.reduce((sum, t) => sum + (t.length || 0), 0);
-      const totalAreaValue = dailyData.reduce((sum, t) => sum + (t.area || 0), 0);
-      const totalTonnageValue = dailyData.reduce((sum, t) => sum + (t.tonnage || 0), 0);
-      const totalWeightValue = dailyData.reduce((sum, t) => sum + (t.weight || 0), 0);
-      const avgYieldValue = (totalAreaValue > 0) ? (totalWeightValue / totalAreaValue) : 0;
+        if (runIndex === -1 && dayIndex === -1) return; // Not found
 
-      totalLength.textContent = totalLengthValue.toFixed(2);
-      totalAreaFoot.textContent = totalAreaValue.toFixed(2);
-      totalTonnageFoot.textContent = totalTonnageValue.toFixed(2);
-      totalWeightFoot.textContent = totalWeightValue.toFixed(2);
-      avgYieldFoot.textContent = avgYieldValue.toFixed(2);
-    }
+        const truckToDelete = runIndex !== -1 ? currentRunData[runIndex] : calendarDayData[dayIndex]; // Get the data before deleting
 
-    function updateTotals() {
-      const numTrucks = dailyData.length;
-      const totalAreaValue = dailyData.reduce((sum, t) => sum + (t.area || 0), 0);
-      const totalWeightValue = dailyData.reduce((sum, t) => sum + (t.weight || 0), 0);
-      const avgYieldVal = totalAreaValue > 0 ? totalWeightValue / totalAreaValue : 0;
+        if (confirm(`Delete entry for Load ${truckToDelete?.loadNumber || id}? This cannot be undone in the same way as 'Undo Last Save'.`)) {
+             // Set last action for potential (more complex) undo, different from simple 'add' undo
+            lastAction = { type: 'delete', data: { ...truckToDelete } };
 
-      totalTrucks.textContent = numTrucks;
-      totalArea.textContent = totalAreaValue.toFixed(2);
-      totalWeight.textContent = totalWeightValue.toFixed(2);
-      averageYield.textContent = avgYieldVal.toFixed(2);
-    }
+            if (runIndex !== -1) {
+                currentRunData.splice(runIndex, 1);
+            }
+            if (dayIndex !== -1) {
+                calendarDayData.splice(dayIndex, 1);
+            }
 
-    function exportToCSV() {
-      // Simplified approach to export ALL data from localStorage
+            saveData();
+            updateAllUI();
+             // Disable simple undo after a delete action
+             // lastAction = { type: null, data: null };
+             // checkUndoButtonState(); // Or allow undoing delete? For now, disable simple undo.
+             undoButton.disabled = true;
+             alert("Entry deleted. The simple 'Undo Last Save' button is now disabled.");
 
-      // First get current day's data
-      let allData = [...dailyData];
-      
-      // Then add ALL archived data regardless of date
-      const archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-      
-      // Flatten all archived data into a single array
-      for (const date in archives) {
-        if (archives[date] && Array.isArray(archives[date])) {
-          // Add a note for same-day resets in the data
-          if (date.includes('_')) {
-            const [baseDate, timestamp] = date.split('_');
-            
-            // Create a visual separator in the CSV export
-            allData.push({
-              loadNumber: '--- RESET DATA ---',
-              startValue: 0,
-              endValue: 0,
-              length: 0,
-              width: 0, 
-              area: 0,
-              tonnage: 0,
-              weight: 0,
-              yield: 0,
-              date: baseDate + ' (Reset)'
-            });
-          }
-          
-          allData = allData.concat(archives[date]);
         }
-      }
-      
-      // If no data at all, show alert and return
-      if (allData.length === 0) {
-        alert('No data to export');
-        return;
-      }
-      
-      // Create simple CSV content - just data rows without complex grouping
-      let csvContent = 'Date,Load Number,Start Sta.,End Sta.,Length (ft),Width (ft),Area (sq yd),Tonnage (tons),Weight (lbs),Yield (lbs/sq yd)\n';
-      
-      // Add all rows of data
-      allData.forEach(item => {
-        const row = [
-          item.date || '',
-          item.loadNumber || '',
-          (item.startValue ?? 0).toFixed(2),
-          (item.endValue ?? 0).toFixed(2),
-          (item.length ?? 0).toFixed(2),
-          (item.width ?? 0).toFixed(2),
-          (item.area ?? 0).toFixed(2),
-          (item.tonnage ?? 0).toFixed(2),
-          (item.weight ?? 0).toFixed(2),
-          (item.yield ?? 0).toFixed(2)
-        ].join(',');
-        csvContent += row + '\n';
-      });
-      
-      // Create download link
-      const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      const today = getTodayDate();
-      link.setAttribute('download', `yield_data_all_records_${today}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      console.log(`Exported ${allData.length} records`);
     }
 
-    function loadData() {
-      const savedDate = localStorage.getItem('asphaltYieldDate');
-      const savedData = localStorage.getItem('asphaltYieldData');
-      const savedEndValue = localStorage.getItem('lastEndValue');
-      const savedWidth = localStorage.getItem('lastWidth');
+    // 15. Undo Last Action (Simple Undo for last saved truck)
+    function undoLastAction() {
+        if (lastAction.type === 'add' && lastAction.data) {
+            const lastAddedId = lastAction.data.id;
 
-      // Load last-end-value and width
-      if (savedEndValue) {
-        lastEndValue = parseFloat(savedEndValue);
-        startValueInput.value = lastEndValue.toFixed(2);
-      }
-      
-      // Only restore width for continuing the same day, not for new days
-      const isNewDay = savedDate !== currentDate;
-      if (savedWidth && !isNewDay) {
-        lastWidth = parseFloat(savedWidth);
-        widthInput.value = lastWidth.toFixed(2);
-      } else {
-        lastWidth = null;
-        widthInput.value = '';
-      }
+            // Remove from currentRunData
+            const runIndex = currentRunData.findIndex(t => t.id === lastAddedId);
+            if (runIndex > -1) {
+                currentRunData.splice(runIndex, 1);
+            }
 
-      // If data is for the same date in local storage, use it; otherwise archive
-      if (savedDate === currentDate && savedData) {
-        try {
-          dailyData = JSON.parse(savedData);
-        } catch (err) {
-          console.error('Error parsing saved data:', err);
-          dailyData = [];
-        }
-      } else if (savedDate && savedDate !== currentDate && savedData) {
-        // If we have a saved date that isn't today, use that date instead of today
-        // This prevents accidental archiving when loading existing work
-        currentDate = savedDate;
-        currentDateDisplay.textContent = formatDateForDisplay(currentDate);
-        
-        try {
-          dailyData = JSON.parse(savedData);
-        } catch (err) {
-          console.error('Error parsing saved data:', err);
-          dailyData = [];
-        }
-      }
-    }
-    
-    function saveData() {
-      localStorage.setItem('asphaltYieldData', JSON.stringify(dailyData));
-      localStorage.setItem('asphaltYieldDate', currentDate);
-      if (lastEndValue !== null) {
-        localStorage.setItem('lastEndValue', lastEndValue.toString());
-      }
-      if (lastWidth !== null) {
-        localStorage.setItem('lastWidth', lastWidth.toString());
-      }
-    }
-    
-    function archiveData() {
-      let archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-      const dataToArchive = localStorage.getItem('asphaltYieldData');
-      if (dataToArchive && currentDate) {
-        try {
-          const parsedData = JSON.parse(dataToArchive);
-          // Only archive if there's actually data to archive
-          if (parsedData && parsedData.length > 0) {
-            archives[currentDate] = parsedData;
-            localStorage.setItem('asphaltYieldArchives', JSON.stringify(archives));
-            console.log(`Archived ${parsedData.length} records for ${currentDate}`);
-          }
-        } catch (err) {
-          console.error('Error archiving data:', err);
-        }
-      }
-    }
-    
-    function startNewDay() {
-      const todayDate = getTodayDate();
-      const isSameCalendarDay = currentDate === todayDate;
-      
-      let confirmMessage = 'Start a new day? This will archive current data.';
-      if (isSameCalendarDay) {
-        confirmMessage = 'You are already on today\'s date. Starting a new day will archive current data and reset the form. Continue?';
-      }
-      
-      if (confirm(confirmMessage)) {
-        // Make sure we archive the current data before clearing it
-        if (dailyData.length > 0) {
-          // If it's the same calendar day, add a timestamp or version to differentiate archives
-          if (isSameCalendarDay) {
-            // Add a timestamp to the current date to make it unique when archiving
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const archiveKey = `${currentDate}_${timestamp}`;
-            
-            let archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-            archives[archiveKey] = dailyData;
-            localStorage.setItem('asphaltYieldArchives', JSON.stringify(archives));
-            console.log(`Archived ${dailyData.length} records for ${archiveKey} (same day reset)`);
-          } else {
-            archiveData();
-            console.log(`Archived ${dailyData.length} records for ${currentDate}`);
-          }
-        }
-        
-        // Reset for new day
-        dailyData = [];
-        lastEndValue = null;
-        lastWidth = null;
-        
-        // Clear all date-related localStorage items for a fresh start
-        localStorage.removeItem('asphaltYieldDate');
-        localStorage.removeItem('asphaltYieldData');
-        localStorage.removeItem('lastEndValue');
-        localStorage.removeItem('lastWidth');
-        
-        // Update to new date (which will be the same date if it's still the same calendar day)
-        currentDate = todayDate;
-        // Use direct date display method to ensure correct date
-        updateDateDisplay();
-        console.log("New day started with date:", currentDate);
-        
-        // Clear the width input field
-        widthInput.value = '';
-        
-        resetFormForNextTruck();
-        updateTruckTable();
-        updateTotals();
-        saveData();
-        
-        // Close archive modal if it's open
-        closeArchiveModalFunc();
-      }
-    }
-    
-    // Save on page unload
-    window.addEventListener('beforeunload', function() {
-      // Always save current data to localStorage
-      saveData();
-      
-      // Always archive current data if there is any
-      if (dailyData.length > 0) {
-        const archives = JSON.parse(localStorage.getItem('asphaltYieldArchives') || '{}');
-        
-        // Check if there are any same-day archives already
-        const todayDate = getTodayDate();
-        const sameDayArchives = Object.keys(archives).filter(key => 
-          key === todayDate || (key.includes('_') && key.startsWith(todayDate + '_'))
-        );
-        
-        // If today's date has a simple archive already (not timestamped), and current date matches today,
-        // add a timestamp to preserve both datasets
-        if (sameDayArchives.includes(todayDate) && currentDate === todayDate) {
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const archiveKey = `${currentDate}_${timestamp}`;
-          archives[archiveKey] = dailyData;
-          console.log(`Archived ${dailyData.length} records for ${archiveKey} (page unload with existing data)`);
+            // Remove from calendarDayData
+            const dayIndex = calendarDayData.findIndex(t => t.id === lastAddedId);
+            if (dayIndex > -1) {
+                calendarDayData.splice(dayIndex, 1);
+            }
+
+            // Clear the last action so it can't be undone again
+            lastAction = { type: null, data: null };
+
+            // Update UI and save state
+            saveData();
+            updateAllUI(); // This includes checkUndoButtonState
+
+            alert("Last saved truck entry removed.");
+
+            // Potentially restore previous 'lastEndValue' and 'lastWidth'? More complex.
+            // For simplicity, just remove the entry.
+
         } else {
-          // Just save normally under current date
-          archives[currentDate] = dailyData;
-          console.log(`Archived ${dailyData.length} records for ${currentDate} on page unload`);
+            alert("No save action to undo.");
         }
-        
-        localStorage.setItem('asphaltYieldArchives', JSON.stringify(archives));
-      }
-    });
+    }
+
+     function checkUndoButtonState() {
+        undoButton.disabled = !(lastAction.type === 'add' && lastAction.data);
+    }
+
 
     /***********************************************************
-     * Additional Calculators (Do NOT store results in CSV/data)
+     * UI Update Functions (Summaries & Tables)
      ***********************************************************/
-    
-    // 10. Paver Speed Calculator
-    function calculatePaverSpeed() {
+
+    // Update the table showing the loads for the CURRENT DAY (all runs)
+    function updateCurrentRunTable() {
+      truckDataBody.innerHTML = ''; // Clear current run table body
+
+      // Get archives for today
+      const archives = loadDataFromStorage(ARCHIVES_KEY) || {};
+      const runsForToday = archives[currentDate] || [];
+      
+      // Sort runs by their runId (timestamp)
+      runsForToday.sort((a, b) => a.runId.localeCompare(b.runId));
+      
+      // Display archived runs from today first
+      runsForToday.forEach((run, index) => {
+        // Add separator for each run
+        const separatorRow = document.createElement('tr');
+        separatorRow.className = 'run-separator';
+        const runTime = new Date(run.runId).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        separatorRow.innerHTML = `<td colspan="11">Run ended at: ${runTime}<span>Remarks: ${run.remarks || 'N/A'}</span></td>`;
+        truckDataBody.appendChild(separatorRow);
+        
+        // Add truck data for this run
+        if (run.data && Array.isArray(run.data)) {
+          run.data.forEach(truck => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${truck.loadNumber || ''}</td>
+              <td>${(truck.startValue ?? 0).toFixed(2)}</td>
+              <td>${(truck.endValue ?? 0).toFixed(2)}</td>
+              <td>${(truck.length ?? 0).toFixed(2)}</td>
+              <td>${(truck.width ?? 0).toFixed(2)}</td>
+              <td>${(truck.area ?? 0).toFixed(2)}</td>
+              <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
+              <td>${(truck.weight ?? 0).toFixed(2)}</td>
+              <td>${(truck.yield ?? 0).toFixed(2)}</td>
+              <td>${formatDateForDisplay(truck.date) || ''}</td>
+              <td>-</td>
+            `;
+            truckDataBody.appendChild(row);
+          });
+        }
+      });
+      
+      // Then display current run data (if it exists)
+      if (currentRunData.length > 0) {
+        // Add separator for current run
+        const currentRunHeader = document.createElement('tr');
+        currentRunHeader.className = 'run-separator';
+        currentRunHeader.innerHTML = `<td colspan="11">Current Run (In Progress)<span>Remarks: In progress</span></td>`;
+        truckDataBody.appendChild(currentRunHeader);
+        
+        // Add current run data
+        currentRunData.forEach(truck => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${truck.loadNumber || ''}</td>
+            <td>${(truck.startValue ?? 0).toFixed(2)}</td>
+            <td>${(truck.endValue ?? 0).toFixed(2)}</td>
+            <td>${(truck.length ?? 0).toFixed(2)}</td>
+            <td>${(truck.width ?? 0).toFixed(2)}</td>
+            <td>${(truck.area ?? 0).toFixed(2)}</td>
+            <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
+            <td>${(truck.weight ?? 0).toFixed(2)}</td>
+            <td>${(truck.yield ?? 0).toFixed(2)}</td>
+            <td>${formatDateForDisplay(truck.date) || ''}</td>
+            <td><span class="delete-btn" data-id="${truck.id}">✖</span></td>
+          `;
+          truckDataBody.appendChild(row);
+        });
+      }
+      
+      // Show message if no data for today
+      if (runsForToday.length === 0 && currentRunData.length === 0) {
+        const noDataRow = document.createElement('tr');
+        noDataRow.innerHTML = '<td colspan="11" style="text-align: center; font-style: italic;">No runs for today yet</td>';
+        truckDataBody.appendChild(noDataRow);
+      }
+
+      // Re-attach delete handlers (only for current run items)
+      document.querySelectorAll('#truckDataBody .delete-btn').forEach(btn => {
+         // Remove existing listener before adding a new one to prevent duplicates
+         btn.replaceWith(btn.cloneNode(true));
+         truckDataBody.querySelector(`[data-id="${btn.getAttribute('data-id')}"]`).addEventListener('click', (e) => {
+             const id = e.target.getAttribute('data-id');
+             if (id) deleteEntry(id);
+         });
+      });
+
+      // Update the footer for the table (show day totals)
+      updateCurrentRunTableFooter();
+    }
+
+    // Update the footer totals for the table (showing day totals)
+    function updateCurrentRunTableFooter() {
+      // Use day totals (all data for today)
+      const totals = calculateTotals(calendarDayData);
+      runTotalLengthFoot.textContent = totals.totalLength.toFixed(2);
+      runTotalAreaFoot.textContent = totals.totalArea.toFixed(2);
+      runTotalTonnageFoot.textContent = totals.totalTonnage.toFixed(2);
+      runTotalWeightFoot.textContent = totals.totalWeight.toFixed(2);
+      runAvgYieldFoot.textContent = totals.avgYield.toFixed(2);
+    }
+
+    // Update the "Current Run Summary" box
+    function updateCurrentRunSummary() {
+        const totals = calculateTotals(currentRunData);
+        runTotalTrucks.textContent = totals.count;
+        runTotalArea.textContent = totals.totalArea.toFixed(2);
+        runTotalWeight.textContent = totals.totalWeight.toFixed(2);
+        runAverageYield.textContent = totals.avgYield.toFixed(2);
+    }
+
+    // Update the "Day Summary" box (using calendar day data)
+    function updateDaySummary() {
+        const totals = calculateTotals(calendarDayData);
+        dayTotalTrucks.textContent = totals.count;
+        dayTotalArea.textContent = totals.totalArea.toFixed(2);
+        dayTotalWeight.textContent = totals.totalWeight.toFixed(2);
+        dayAverageYield.textContent = totals.avgYield.toFixed(2);
+    }
+
+
+    // Helper function to calculate totals for any given array of truck data
+    function calculateTotals(dataArray) {
+      const count = dataArray.length;
+      const totalLength = dataArray.reduce((sum, t) => sum + (t.length || 0), 0);
+      const totalArea = dataArray.reduce((sum, t) => sum + (t.area || 0), 0);
+      const totalTonnage = dataArray.reduce((sum, t) => sum + (t.tonnage || 0), 0);
+      const totalWeight = dataArray.reduce((sum, t) => sum + (t.weight || 0), 0);
+      const avgYield = (totalArea > 0) ? (totalWeight / totalArea) : 0;
+      return { count, totalLength, totalArea, totalTonnage, totalWeight, avgYield };
+    }
+
+
+    /***********************************************************
+     * Archive Viewing Functions
+     ***********************************************************/
+
+    function openArchiveModal() {
+      populateArchiveDates(); // Populate dropdown with unique dates (previous days)
+      archiveModal.style.display = 'block';
+      
+      // Clear previous data and set default view
+      archiveDataBody.innerHTML = ''; 
+      const noSelectionRow = document.createElement('tr');
+      noSelectionRow.innerHTML = '<td colspan="10" style="text-align: center; font-style: italic;">Select a date to view previous runs</td>';
+      archiveDataBody.appendChild(noSelectionRow);
+      
+      // Reset totals - pass an empty array
+      updateArchiveFooterTotals([]);
+      
+      // Set the title to indicate these are previous days' runs
+      document.querySelector('#archiveModal h2').textContent = "Previous Days' Run Data";
+    }
+
+    // Function to display today's runs in the archive view - REMOVED
+
+    function closeArchiveModalFunc() {
+      archiveModal.style.display = 'none';
+    }
+
+    // 9. Display Runs within Day: Populate dropdown with unique dates only
+    function populateArchiveDates() {
+      archiveDateSelect.innerHTML = '<option value="">Select a date...</option>'; // Clear existing options
+
+      const archives = loadDataFromStorage(ARCHIVES_KEY) || {};
+      const todayDate = getTodayDate(); // Get current date
+      
+      // Filter out today's date and get unique dates
+      const uniqueDates = [...new Set(Object.keys(archives))]
+                           .filter(date => date !== todayDate) // Filter out today
+                           .sort((a, b) => new Date(b) - new Date(a)); // Sort descending
+
+      uniqueDates.forEach(date => {
+        const option = document.createElement('option');
+        option.value = date;
+        option.textContent = formatDateForDisplay(date); // Display formatted date
+        archiveDateSelect.appendChild(option);
+      });
+      
+      // Display message if no previous dates
+      if (uniqueDates.length === 0) {
+        const noDataOption = document.createElement('option');
+        noDataOption.disabled = true;
+        noDataOption.textContent = "No previous days' data available";
+        archiveDateSelect.appendChild(noDataOption);
+      }
+    }
+
+
+     // 9. Display Runs within Day: Load all runs for the selected calendar date
+    function loadArchiveDataForSelectedDate() {
+        const selectedDate = archiveDateSelect.value;
+        archiveDataBody.innerHTML = ''; // Clear previous data
+        currentArchiveDisplayData = []; // Clear data holder
+
+        if (!selectedDate) {
+            // If no date is selected, show message
+            const noSelectionRow = document.createElement('tr');
+            noSelectionRow.innerHTML = '<td colspan="10" style="text-align: center; font-style: italic;">Select a date to view previous runs</td>';
+            archiveDataBody.appendChild(noSelectionRow);
+            // Reset totals
+            updateArchiveFooterTotals([]);
+            return;
+        }
+
+        // Set the title to indicate we're viewing a previous day
+        document.querySelector('#archiveModal h2').textContent = `Run Data for ${formatDateForDisplay(selectedDate)}`;
+
+        const archives = loadDataFromStorage(ARCHIVES_KEY) || {};
+        const runsForDay = archives[selectedDate] || [];
+
+        // Sort runs by their runId (timestamp)
+        runsForDay.sort((a, b) => a.runId.localeCompare(b.runId));
+
+        let allDataForDay = []; // To calculate totals
+
+        runsForDay.forEach((run, index) => {
+            // 10. Visual Separators
+            if (index > 0) { // Add separator before the second run onwards
+                const separatorRow = document.createElement('tr');
+                separatorRow.className = 'run-separator';
+                const runTime = new Date(run.runId).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                separatorRow.innerHTML = `<td colspan="10">Run ended at: ${runTime} <span>Remarks: ${run.remarks || 'N/A'}</span></td>`;
+                archiveDataBody.appendChild(separatorRow);
+            } else {
+                 // Optional: Add header for the first run
+                 const separatorRow = document.createElement('tr');
+                 separatorRow.className = 'run-separator';
+                 const runTime = new Date(run.runId).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                 separatorRow.innerHTML = `<td colspan="10">Run ended at: ${runTime} (First run of day)<span>Remarks: ${run.remarks || 'N/A'}</span></td>`;
+                 archiveDataBody.appendChild(separatorRow);
+            }
+
+            // Add truck data rows for this run
+            if (run.data && Array.isArray(run.data)) {
+                run.data.forEach(truck => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${truck.loadNumber || ''}</td>
+                        <td>${(truck.startValue ?? 0).toFixed(2)}</td>
+                        <td>${(truck.endValue ?? 0).toFixed(2)}</td>
+                        <td>${(truck.length ?? 0).toFixed(2)}</td>
+                        <td>${(truck.width ?? 0).toFixed(2)}</td>
+                        <td>${(truck.area ?? 0).toFixed(2)}</td>
+                        <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
+                        <td>${(truck.weight ?? 0).toFixed(2)}</td>
+                        <td>${(truck.yield ?? 0).toFixed(2)}</td>
+                        <td>${formatDateForDisplay(truck.date) || ''}</td>
+                    `;
+                    archiveDataBody.appendChild(row);
+                    allDataForDay.push(truck); // Add to array for total calculation and export
+                });
+            }
+        });
+
+        // If no data for selected day, show a message
+        if (allDataForDay.length === 0) {
+            const noDataRow = document.createElement('tr');
+            noDataRow.innerHTML = '<td colspan="10" style="text-align: center; font-style: italic;">No data found for selected date</td>';
+            archiveDataBody.appendChild(noDataRow);
+        }
+
+        currentArchiveDisplayData = allDataForDay; // Store for export
+        updateArchiveFooterTotals(allDataForDay); // Update footer with totals for all runs of the day
+    }
+
+    // Update the footer totals for the ARCHIVE table
+    function updateArchiveFooterTotals(data) {
+      // Ensure data is an array before passing to calculateTotals
+      const dataArray = Array.isArray(data) ? data : [];
+      const totals = calculateTotals(dataArray); // Use the common calculator
+      archiveTotalLength.textContent = totals.totalLength.toFixed(2);
+      archiveTotalAreaFoot.textContent = totals.totalArea.toFixed(2);
+      archiveTotalTonnageFoot.textContent = totals.totalTonnage.toFixed(2);
+      archiveTotalWeightFoot.textContent = totals.totalWeight.toFixed(2);
+      archiveAvgYieldFoot.textContent = totals.avgYield.toFixed(2);
+    }
+
+
+    /***********************************************************
+     * Export Functionality (Excel)
+     ***********************************************************/
+
+     // 13. Export selected day's data (all runs) to Excel
+    function exportArchiveToExcel() {
+        const selectedDate = archiveDateSelect.value;
+        const todayDate = getTodayDate();
+        let exportDate = selectedDate || todayDate; // If no date is selected, use today
+        let exportTitle = selectedDate ? `HMA_Paving_${exportDate}` : `HMA_Paving_Today_${exportDate}`;
+
+        if (currentArchiveDisplayData.length === 0) {
+            alert('No data available to export.');
+            return;
+        }
+
+        console.log(`Exporting ${currentArchiveDisplayData.length} records for ${exportDate} to Excel...`);
+
+        // Prepare data for SheetJS: Array of objects
+        const dataForSheet = currentArchiveDisplayData.map(item => ({
+            'Date': formatDateForDisplay(item.date) || '',
+            'Load Number': item.loadNumber || '',
+            'Start Sta.': (item.startValue ?? 0).toFixed(2),
+            'End Sta.': (item.endValue ?? 0).toFixed(2),
+            'Length (ft)': (item.length ?? 0).toFixed(2),
+            'Width (ft)': (item.width ?? 0).toFixed(2),
+            'Area (sq yd)': (item.area ?? 0).toFixed(2),
+            'Tonnage (tons)': (item.tonnage ?? 0).toFixed(2),
+            'Weight (lbs)': (item.weight ?? 0).toFixed(2),
+            'Yield (lbs/sq yd)': (item.yield ?? 0).toFixed(2)
+            // Remarks could be added as a column if desired, but they are in separators visually
+        }));
+
+        // Add a totals row at the end
+        const totals = calculateTotals(currentArchiveDisplayData);
+        dataForSheet.push({ // Add an empty row for spacing
+             'Date': '', 'Load Number': '', 'Start Sta.': '', 'End Sta.': '', 'Length (ft)': '',
+             'Width (ft)': '', 'Area (sq yd)': '', 'Tonnage (tons)': '', 'Weight (lbs)': '', 'Yield (lbs/sq yd)': ''
+        });
+        dataForSheet.push({
+            'Date': 'TOTALS',
+            'Load Number': '',
+            'Start Sta.': '',
+            'End Sta.': '',
+            'Length (ft)': totals.totalLength.toFixed(2),
+            'Width (ft)': '',
+            'Area (sq yd)': totals.totalArea.toFixed(2),
+            'Tonnage (tons)': totals.totalTonnage.toFixed(2),
+            'Weight (lbs)': totals.totalWeight.toFixed(2),
+            'Yield (lbs/sq yd)': totals.avgYield.toFixed(2)
+        });
+
+        try {
+            // Create worksheet
+            const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+
+            // Optional: Adjust column widths
+             const columnWidths = [
+                { wch: 15 }, // Date
+                { wch: 12 }, // Load Number
+                { wch: 12 }, // Start Sta.
+                { wch: 12 }, // End Sta.
+                { wch: 12 }, // Length (ft)
+                { wch: 12 }, // Width (ft)
+                { wch: 13 }, // Area (sq yd)
+                { wch: 14 }, // Tonnage (tons)
+                { wch: 14 }, // Weight (lbs)
+                { wch: 18 }  // Yield (lbs/sq yd)
+            ];
+            worksheet['!cols'] = columnWidths;
+
+
+            // Create workbook
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Yield Data');
+
+            // Generate filename
+            const filename = exportDate === todayDate ? 
+                `HMA_Paving_Today_${exportDate}.xlsx` : 
+                `HMA_Paving_Previous_Day_${exportDate}.xlsx`;
+
+            // Trigger download
+            XLSX.writeFile(workbook, filename);
+            console.log("Excel file generation successful.");
+
+        } catch (error) {
+            console.error("Error generating Excel file:", error);
+            alert("Failed to generate Excel file. See console for details.");
+        }
+    }
+
+    // Function to export today's data directly without opening the archive modal
+    function exportTodayDataToExcel() {
+        const todayDate = getTodayDate();
+        
+        // Get today's data from the current run, calendar day data, and archives for today
+        let todayData = [...currentRunData]; // Start with current run data
+        
+        // Add calendar day data
+        if (calendarDayData && Array.isArray(calendarDayData) && calendarDayData.length > 0) {
+            todayData = [...todayData, ...calendarDayData];
+        }
+        
+        // Also include previously archived runs from today
+        const archives = loadDataFromStorage(ARCHIVES_KEY) || {};
+        if (archives[todayDate]) {
+            archives[todayDate].forEach(run => {
+                if (run.data && Array.isArray(run.data)) {
+                    todayData = [...todayData, ...run.data];
+                }
+            });
+        }
+        
+        // Remove duplicates by load number if present
+        if (todayData.length > 0 && todayData[0].loadNumber) {
+            const uniqueData = [];
+            const loadNumbers = new Set();
+            
+            todayData.forEach(item => {
+                if (item.loadNumber && !loadNumbers.has(item.loadNumber)) {
+                    loadNumbers.add(item.loadNumber);
+                    uniqueData.push(item);
+                } else if (!item.loadNumber) {
+                    // If no load number, just include it
+                    uniqueData.push(item);
+                }
+            });
+            
+            todayData = uniqueData;
+        }
+        
+        // Check if we have data to export
+        if (todayData.length === 0) {
+            alert('No data available to export for today.');
+            return;
+        }
+        
+        console.log(`Exporting ${todayData.length} records for today (${todayDate}) to Excel...`);
+        
+        // Prepare data for SheetJS: Array of objects
+        const dataForSheet = todayData.map(item => ({
+            'Date': formatDateForDisplay(item.date) || '',
+            'Load Number': item.loadNumber || '',
+            'Start Sta.': (item.startValue ?? 0).toFixed(2),
+            'End Sta.': (item.endValue ?? 0).toFixed(2),
+            'Length (ft)': (item.length ?? 0).toFixed(2),
+            'Width (ft)': (item.width ?? 0).toFixed(2),
+            'Area (sq yd)': (item.area ?? 0).toFixed(2),
+            'Tonnage (tons)': (item.tonnage ?? 0).toFixed(2),
+            'Weight (lbs)': (item.weight ?? 0).toFixed(2),
+            'Yield (lbs/sq yd)': (item.yield ?? 0).toFixed(2)
+        }));
+        
+        // Add a totals row at the end
+        const totals = calculateTotals(todayData);
+        dataForSheet.push({ // Add an empty row for spacing
+             'Date': '', 'Load Number': '', 'Start Sta.': '', 'End Sta.': '', 'Length (ft)': '',
+             'Width (ft)': '', 'Area (sq yd)': '', 'Tonnage (tons)': '', 'Weight (lbs)': '', 'Yield (lbs/sq yd)': ''
+        });
+        dataForSheet.push({
+            'Date': 'TOTALS',
+            'Load Number': '',
+            'Start Sta.': '',
+            'End Sta.': '',
+            'Length (ft)': totals.totalLength.toFixed(2),
+            'Width (ft)': '',
+            'Area (sq yd)': totals.totalArea.toFixed(2),
+            'Tonnage (tons)': totals.totalTonnage.toFixed(2),
+            'Weight (lbs)': totals.totalWeight.toFixed(2),
+            'Yield (lbs/sq yd)': totals.avgYield.toFixed(2)
+        });
+        
+        try {
+            // Create worksheet
+            const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+            
+            // Optional: Adjust column widths
+            const columnWidths = [
+                { wch: 15 }, // Date
+                { wch: 12 }, // Load Number
+                { wch: 12 }, // Start Sta.
+                { wch: 12 }, // End Sta.
+                { wch: 12 }, // Length (ft)
+                { wch: 12 }, // Width (ft)
+                { wch: 13 }, // Area (sq yd)
+                { wch: 14 }, // Tonnage (tons)
+                { wch: 14 }, // Weight (lbs)
+                { wch: 18 }  // Yield (lbs/sq yd)
+            ];
+            worksheet['!cols'] = columnWidths;
+            
+            // Create workbook
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Yield Data');
+            
+            // Generate filename
+            const filename = `HMA_Paving_Today_${todayDate}.xlsx`;
+            
+            // Trigger download
+            XLSX.writeFile(workbook, filename);
+            console.log("Excel file generation successful.");
+            
+        } catch (error) {
+            console.error("Error generating Excel file:", error);
+            alert("Failed to generate Excel file. See console for details.");
+        }
+    }
+
+
+    /***********************************************************
+     * Additional Calculators (No data storage)
+     ***********************************************************/
+    function calculatePaverSpeed() { /* ... (implementation unchanged) ... */
       const R_p = parseFloat(paverProdRate.value) || 0;
       const W = parseFloat(paverWidth.value) || 0;
       const A = parseFloat(paverYield.value) || 0;
-
-      if (R_p <= 0 || W <= 0 || A <= 0) {
-        paverSpeedResult.textContent = '-';
-        return;
+      if (R_p <= 0 || W <= 0 || A <= 0 || A === Infinity) {
+        paverSpeedResult.textContent = '-'; return;
       }
-      // L = [2000(9)]/[W(A)]
       const L = (2000 * 9) / (W * A);
-      // V = (R_p * L) / 60
       const V = (R_p * L) / 60;
-      paverSpeedResult.textContent = V.toFixed(2);
+      paverSpeedResult.textContent = (V === Infinity || isNaN(V)) ? '-' : V.toFixed(2);
     }
-
-    // 11. Projected Paving Length
-    function calculateProjectedLength() {
-      const T = parseFloat(projTons.value) || 0; 
+    function calculateProjectedLength() { /* ... (implementation unchanged) ... */
+      const T = parseFloat(projTons.value) || 0;
       const LW = parseFloat(projLaneWidth.value) || 0;
       const Y = parseFloat(projYield.value) || 0;
-
       if (T <= 0 || LW <= 0 || Y <= 0) {
-        projLengthResult.textContent = '-';
-        return;
+        projLengthResult.textContent = '-'; return;
       }
-
-      // Projected Paving Length = (Tons / ( (((LaneWidth*100)/9)*Yield) / 2000 )) * 100
-      // Denominator: ( ( (LW*100)/9 ) * Y ) / 2000
       const denominator = (((LW * 100) / 9) * Y) / 2000;
+      if (denominator <= 0 || denominator === Infinity || isNaN(denominator)) {
+          projLengthResult.textContent = '-'; return;
+      }
       const projLength = (T / denominator) * 100;
-      projLengthResult.textContent = projLength.toFixed(2);
+      projLengthResult.textContent = (projLength === Infinity || isNaN(projLength)) ? '-' : projLength.toFixed(2);
     }
-
-    // 12. Tonnage Calculator (HMA Usage)
-    function calculateTonnageUsed() {
+    function calculateTonnageUsed() { /* ... (implementation unchanged) ... */
       const L = parseFloat(tonLength.value) || 0;
       const W = parseFloat(tonWidth.value) || 0;
       const D = parseFloat(tonDepth.value) || 0;
-
       if (L <= 0 || W <= 0 || D <= 0) {
-        tonCalcResult.textContent = '-';
-        return;
+        tonCalcResult.textContent = '-'; return;
       }
-      // Tons Used = ((L * W / 9) * 110 * D) / 2000
-      const areaYd2 = (L * W) / 9; // Convert to sq yd
-      const lbs = areaYd2 * 110 * D; // 110 lbs per inch-depth per sq yd
+      const areaYd2 = (L * W) / 9;
+      const lbs = areaYd2 * 110 * D; // Using standard 110 lb/sq yd/in rule of thumb
       const tonsUsed = lbs / 2000;
       tonCalcResult.textContent = tonsUsed.toFixed(2);
     }
 
-    // Initialize the app
-    loadData();
-  </script>
-  
-  <!-- Add JavaScript for Hamburger Menu -->
-  <script>
-    // Hamburger Menu Functionality
-    const hamburgerIcon = document.querySelector('.hamburger-icon');
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.querySelector('.overlay');
-    const menuItems = document.querySelectorAll('.sidebar-menu li');
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    const darkModeSwitch = document.getElementById('darkModeSwitch');
-    
-    // Swipe detection variables
-    let touchStartX = 0;
-    let touchEndX = 0;
-    const SWIPE_THRESHOLD = 70; // Minimum distance for a swipe to be registered
-    const EDGE_THRESHOLD = 30; // Maximum distance from edge to start a swipe
-    
-    // Check for saved theme preference
+    /***********************************************************
+     * Sidebar, Theme, PWA, Misc Utils
+     ***********************************************************/
+
     function initTheme() {
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        darkModeSwitch.classList.add('active');
-      } else {
-        // Explicitly set to light theme if no theme or light theme is saved
-        document.documentElement.removeAttribute('data-theme');
-        darkModeSwitch.classList.remove('active');
-      }
+        const savedTheme = localStorage.getItem(THEME_KEY);
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            darkModeSwitch.classList.add('active');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            darkModeSwitch.classList.remove('active');
+        }
     }
-    
-    // Initialize theme
-    initTheme();
-    
-    // Toggle menu open/close
-    hamburgerIcon.addEventListener('click', function(e) {
-      e.stopPropagation();
-      toggleMenu();
-    });
-    
-    // Handle hamburger icon touch events separately
-    const hamburgerSpans = hamburgerIcon.querySelectorAll('span');
-    
-    // Add touchend event to hamburger icon and its spans
-    [hamburgerIcon, ...hamburgerSpans].forEach(el => {
-      el.addEventListener('touchend', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleMenu();
-      }, { passive: false });
-    });
-    
-    // Handle overlay - simplified approach for more reliable closing
-    overlay.addEventListener('click', closeMenu);
-    overlay.addEventListener('touchend', function(e) {
-      // Only handle direct touches on the overlay itself
-      if (e.target === overlay) {
-        e.preventDefault();
-        closeMenu();
-      }
-    }, { passive: false });
-    
-    // Add swipe detection to the document
-    document.addEventListener('touchstart', function(e) {
-      // Skip hamburger icon to avoid conflicts with its own handler
-      if (e.target.closest('.hamburger-icon')) {
-        return;
-      }
-      
-      touchStartX = e.changedTouches[0].screenX;
-      // Don't prevent default here to allow normal touch interactions
-    }, { passive: true });
-    
-    document.addEventListener('touchend', function(e) {
-      // Skip hamburger icon and overlay to avoid conflicts
-      if (e.target.closest('.hamburger-icon') || e.target === overlay) {
-        return;
-      }
-      
-      touchEndX = e.changedTouches[0].screenX;
-      handleSwipe();
-    }, { passive: true });
-    
-    // Handle swipe gestures
-    function handleSwipe() {
-      const swipeDistance = touchEndX - touchStartX;
-      
-      // Right swipe (open menu) - only if starting near the left edge
-      if (swipeDistance > SWIPE_THRESHOLD && touchStartX < EDGE_THRESHOLD) {
-        openMenu();
-      }
-      
-      // Left swipe (close menu) - only if menu is open
-      else if (swipeDistance < -SWIPE_THRESHOLD && sidebar.classList.contains('open')) {
-        closeMenu();
-      }
+
+     function toggleDarkMode() {
+        if (document.documentElement.getAttribute('data-theme') === 'dark') {
+            document.documentElement.removeAttribute('data-theme');
+            localStorage.setItem(THEME_KEY, 'light');
+            darkModeSwitch.classList.remove('active');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem(THEME_KEY, 'dark');
+            darkModeSwitch.classList.add('active');
+        }
     }
-    
-    // Add swipe detection for the sidebar itself
-    sidebar.addEventListener('touchstart', function(e) {
-      // Allow events inside the sidebar to behave normally
-      e.stopPropagation();
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-    
-    sidebar.addEventListener('touchend', function(e) {
-      // Process swipe only if it's a left swipe (to close)
-      touchEndX = e.changedTouches[0].screenX;
-      const swipeDistance = touchEndX - touchStartX;
-      
-      if (swipeDistance < -SWIPE_THRESHOLD) {
-        closeMenu();
-      }
-    }, { passive: true });
-    
-    // Dark mode toggle
-    function toggleDarkMode() {
-      // Toggle dark mode
-      if (document.documentElement.getAttribute('data-theme') === 'dark') {
-        document.documentElement.removeAttribute('data-theme');
-        localStorage.setItem('theme', 'light');
-        darkModeSwitch.classList.remove('active');
-      } else {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('theme', 'dark');
-        darkModeSwitch.classList.add('active');
-      }
-    }
-    
-    // Properly handle dark mode toggle clicks
-    darkModeToggle.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleDarkMode();
-    });
-    
-    // Also handle direct click on the switch
-    darkModeSwitch.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleDarkMode();
-    });
-    
-    // Add touch support for the toggle switch
-    darkModeSwitch.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleDarkMode();
-    }, { passive: false });
-    
-    // Menu item click handling
-    const menuItemsArray = Array.from(menuItems);
-    let newMenuItems = [];
-    
-    menuItemsArray.forEach(item => {
-      // Skip dark mode toggle item completely
-      if (item.id === 'darkModeToggle') {
-        newMenuItems.push(item);
-        return;
-      }
-      
-      // Special handling for Export All Data button
-      if (item.id === 'exportAllDataButton') {
-        const newItem = item.cloneNode(true);
-        item.parentNode.replaceChild(newItem, item);
-        newMenuItems.push(newItem);
-        
-        newItem.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          // Close the menu first before exporting
-          hamburgerIcon.classList.remove('open');
-          sidebar.classList.remove('open');
-          overlay.classList.remove('open');
-          
-          // Wait a short time for menu animations to complete before exporting
-          setTimeout(function() {
-            // Run the export function directly
-            exportToCSV();
-          }, 100);
+
+    function setupSidebarMenu() {
+        // Re-select menu items in case of dynamic changes (though unlikely here)
+        const currentMenuItems = document.querySelectorAll('.sidebar-menu li');
+
+        hamburgerIcon.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', closeMenu);
+
+        // Dark mode toggle listener
+        darkModeToggle.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent li click handler
+            toggleDarkMode();
         });
-        return;
-      }
-      
-      // Special handling for About button
-      if (item.id === 'aboutButton') {
-        const newItem = item.cloneNode(true);
-        item.parentNode.replaceChild(newItem, item);
-        newMenuItems.push(newItem);
-        
-        newItem.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          // Close the menu first before opening About modal
-          hamburgerIcon.classList.remove('open');
-          sidebar.classList.remove('open');
-          overlay.classList.remove('open');
-          
-          // Wait a short time for menu animations to complete
-          setTimeout(function() {
-            // Open the About modal
-            openAboutModal();
-          }, 100);
+        darkModeSwitch.addEventListener('click', (e) => {
+             e.stopPropagation(); // Prevent li click handler
+            toggleDarkMode();
         });
-        return;
-      }
-      
-      if (!item.classList.contains('settings-item')) {
-        // Remove all existing event listeners by cloning and replacing the element
-        const newItem = item.cloneNode(true);
-        item.parentNode.replaceChild(newItem, item);
-        newMenuItems.push(newItem);
-        
-        // Add a single click handler - works for both mouse clicks and touch on most devices
-        newItem.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const tabId = this.getAttribute('data-tab');
-          
-          // Update active class in sidebar using the new references
-          newMenuItems.forEach(mi => {
-            if (!mi.classList.contains('settings-item') && !mi.classList.contains('divider')) {
-              mi.classList.remove('active');
+
+
+        currentMenuItems.forEach(item => {
+            if (item.id === 'darkModeToggle') return; // Skip dark mode item
+
+            if (item.id === 'aboutButton') {
+                 // Special handler for About button
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openAboutModal();
+                    closeMenu(); // Close sidebar after action
+                });
+            } else if (item.getAttribute('data-tab')) {
+                // Standard tab navigation handler
+                item.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tabId = this.getAttribute('data-tab');
+
+                    // Update active class in sidebar
+                    currentMenuItems.forEach(mi => mi.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Update tab content visibility
+                    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+                    const targetTab = document.getElementById(tabId);
+                    if(targetTab) targetTab.classList.add('active');
+
+                    closeMenu(); // Close sidebar after navigation
+                });
             }
-          });
-          this.classList.add('active');
-          
-          // Update tab content
-          tabContents.forEach(tc => tc.classList.remove('active'));
-          document.getElementById(tabId).classList.add('active');
-          
-          // Force close the menu with a longer delay to ensure all other events are done
-          setTimeout(function() {
-            hamburgerIcon.classList.remove('open');
-            sidebar.classList.remove('open');
-            overlay.classList.remove('open');
-          }, 50);
         });
-      } else if (item.id !== 'darkModeToggle') {
-        // For settings items (except dark mode toggle), add to our new array
-        newMenuItems.push(item);
-      }
-    });
-    
+    }
+
+
     function toggleMenu() {
       hamburgerIcon.classList.toggle('open');
       sidebar.classList.toggle('open');
       overlay.classList.toggle('open');
     }
-    
-    function openMenu() {
-      hamburgerIcon.classList.add('open');
-      sidebar.classList.add('open');
-      overlay.classList.add('open');
-    }
-    
     function closeMenu() {
       hamburgerIcon.classList.remove('open');
       sidebar.classList.remove('open');
       overlay.classList.remove('open');
     }
-  </script>
-  
-  <!-- Service Worker Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(registration => {
-            console.log('Service Worker registered successfully:', registration.scope);
-            
-            // Check for updates to the service worker
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              
-              // Track the state changes of the new service worker
-              newWorker.addEventListener('statechange', () => {
-                // When the new service worker is installed and waiting
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  console.log('New version available! Refreshing page...');
-                  // Show a notification to the user (optional)
-                  if ('Notification' in window && Notification.permission === 'granted') {
-                    new Notification('App Update', {
-                      body: 'A new version is available. The page will refresh shortly.'
-                    });
-                  }
-                  
-                  // Refresh the page after a short delay
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 1000);
-                }
-              });
-            });
-            
-            // Check if there's an existing service worker waiting
-            if (registration.waiting) {
-              console.log('New service worker waiting. Refreshing page...');
-              window.location.reload();
-            }
-          })
-          .catch(error => {
-            console.error('Service Worker registration failed:', error);
-          });
-          
-        // Listen for controlling service worker changes
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          console.log('New service worker activated. Reloading page for fresh content...');
-          window.location.reload();
-        });
-      });
-    }
-  </script>
-
-  <!-- Add event listeners for About functionality -->
-  <script>
-    aboutButton.addEventListener('click', openAboutModal);
-    closeAboutModal.addEventListener('click', closeAboutModalFunc);
-    closeAboutButton.addEventListener('click', closeAboutModalFunc);
-    
-    // Close about modal when clicking outside of it
-    window.addEventListener('click', function(event) {
-      if (event.target == aboutModal) {
-        closeAboutModalFunc();
-      }
-      // Keep the existing archive modal handler
-      if (event.target == archiveModal) {
-        closeArchiveModalFunc();
-      }
-    });
-    
-    // Prevent about modal content clicks from closing the modal
-    document.querySelector('#aboutModal > div').addEventListener('click', function(event) {
-      event.stopPropagation();
-    });
-    
-    // Function to open the about modal
     function openAboutModal() {
       aboutModal.style.display = 'block';
-      // Close the sidebar menu when opening the modal
       closeMenu();
     }
-    
-    // Function to close the about modal
     function closeAboutModalFunc() {
       aboutModal.style.display = 'none';
     }
+
+    function setupTouchControls() {
+         document.addEventListener('touchmove', function(event) {
+            // Allow vertical scrolling within designated containers
+            const canScroll = event.target.closest('.container, .data-table-container, .archive-modal-content, .sidebar');
+            if (!canScroll && event.touches.length === 1) {
+                 // Prevent scroll only if not in a scrollable area and it's a single touch
+                 // This helps prevent body scroll while allowing pinch zoom if needed
+                // event.preventDefault(); // Commented out to be less aggressive, rely on CSS fixed body
+            }
+             // Prevent pinch zoom explicitly (more reliable)
+            if (event.scale !== undefined && event.scale !== 1) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+
+        // Prevent double-tap zoom
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+    }
+
+    function setupNumericInputValidation() {
+        const numericInputs = document.querySelectorAll('input[type="number"]');
+        numericInputs.forEach(input => {
+             input.addEventListener('input', function() {
+                // Optional: Add more aggressive validation on input if needed
+                const value = this.value;
+                // Remove non-numeric characters except decimal point and leading minus (if allowed)
+                // This example doesn't allow minus, enforces positive numbers or zero
+                 let cleanedValue = value.replace(/[^\d.]/g, '');
+                 // Ensure only one decimal point
+                 const parts = cleanedValue.split('.');
+                 if (parts.length > 2) {
+                     cleanedValue = parts[0] + '.' + parts.slice(1).join('');
+                 }
+                 if (cleanedValue !== value) {
+                     this.value = cleanedValue;
+                 }
+             });
+
+            input.addEventListener('blur', function() {
+                if (this.value !== '') {
+                    const min = parseFloat(this.min);
+                    const value = parseFloat(this.value);
+                    if (!isNaN(min) && !isNaN(value) && value < min) {
+                        this.value = min.toFixed(this.step.includes('.') ? this.step.split('.')[1].length : 0); // Format to correct decimal places
+                    }
+                     // Ensure non-empty fields aren't just "."
+                    if (this.value === '.') {
+                        this.value = '';
+                    }
+                }
+            });
+        });
+    }
+
+    // Service Worker Registration (Optional but good for PWA)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js') // Make sure sw.js exists
+          .then(registration => console.log('Service Worker registered successfully:', registration.scope))
+          .catch(error => console.error('Service Worker registration failed:', error));
+      });
+    }
+
   </script>
 </body>
 </html>
