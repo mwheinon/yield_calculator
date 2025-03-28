@@ -156,4 +156,4 @@ For support, please:
    - Screenshots if applicable
 
 ## Current Version
-Last updated: March 24, 2025
+Last updated: March 28, 2025
