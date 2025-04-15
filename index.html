@@ -700,7 +700,7 @@
     .archive-modal-content {
       position: relative;
       background-color: var(--card-bg);
-      margin: 5% auto; /* Reduced top margin */
+      margin: auto; /* Changed from 5% auto to auto for vertical centering */
       padding: 15px; /* Reduced padding */
       width: 95%; /* Wider */
       max-width: 900px; /* Max width */
@@ -711,6 +711,8 @@
       display: flex; /* Use flexbox for layout */
       flex-direction: column;
       max-height: 90vh; /* Limit height */
+      top: 50%; /* Position at 50% from the top */
+      transform: translateY(-50%); /* Move up by half of its height */
     }
 
     .archive-close {
@@ -732,7 +734,7 @@
 
     @media (max-width: 768px) {
       .archive-modal-content {
-        margin: 2% auto;
+        margin: auto; /* Changed from 2% auto to auto for vertical centering */
         padding: 10px;
         width: 98%;
         max-height: 95vh;
@@ -1134,6 +1136,22 @@
       text-align: center;
     }
 
+    /* Show controls for current run when dataTab is editable */
+    #dataTab.editable-mode-active > .edit-controls:not(#archiveEditControls) {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    /* Show controls for archive modal when its content is editable */
+    .archive-modal-content.editable-mode-active #archiveEditControls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      /* Remove margin-top since we're adding it inline */
+    }
+
+
     .editable-mode-active .edit-controls {
       display: flex;
       justify-content: center;
@@ -1388,11 +1406,7 @@
                 <option value="">Select a date...</option>
               </select>
             </div>
-            <!-- Add edit controls for the archive table -->
-            <div class="edit-controls" id="archiveEditControls">
-              <button id="saveArchiveChangesBtn" class="action-btn save-btn">Save Changes</button>
-              <button id="cancelArchiveEditingBtn" class="action-btn undo-btn">Cancel</button>
-            </div>
+            <!-- Remove edit controls from here -->
             <!-- 9. Display Runs within Day -> Table container takes remaining space -->
             <div class="data-table-container" style="max-height: 65vh; text-align: center;">
               <!-- 11. Improve Mobile Display -> Styles applied via CSS -->
@@ -1439,6 +1453,11 @@
               </button>
               <!-- 13. Rename Export button -->
               <button id="exportArchiveButton" class="action-btn save-btn">Export Day</button>
+            </div>
+            <!-- Add edit controls here, after the buttons -->
+            <div class="edit-controls" id="archiveEditControls" style="margin-top: 10px;">
+              <button id="saveArchiveChangesBtn" class="action-btn save-btn">Save Changes</button>
+              <button id="cancelArchiveEditingBtn" class="action-btn undo-btn">Cancel</button>
             </div>
           </div>
         </div>
@@ -3078,6 +3097,9 @@
         editModeBtn.textContent = 'Disable Edit Mode';
         editModeBtn.style.backgroundColor = 'var(--danger)';
         
+        // Hide the 'Previous Days' button while in edit mode
+        viewArchivesButton.style.display = 'none';
+        
         // Store original data for potential cancel
         originalCurrentRunData = JSON.parse(JSON.stringify(currentRunData));
         
@@ -3106,13 +3128,17 @@
         isArchiveEditMode = true;
         archiveEditModeBtn.textContent = 'Disable Edit Mode';
         archiveEditModeBtn.style.backgroundColor = 'var(--danger)';
-        
+        archiveEditControls.style.display = 'flex'; // Show controls
+
+        // Hide export button while in edit mode
+        exportArchiveButton.style.display = 'none';
+
         // Store original data for potential cancel
         originalArchiveData = JSON.parse(JSON.stringify(currentArchiveDisplayData));
-        
+
         // Apply editable class to container
         document.querySelector('.archive-modal-content').classList.add('editable-mode-active');
-        
+
         // Make table cells editable
         makeArchiveTableEditable();
     }
@@ -3460,6 +3486,9 @@
             // Clear edited cells tracker
             editedCells.clear();
             
+            // Show the 'Previous Days' button again
+            viewArchivesButton.style.display = 'block';
+            
             // Refresh the UI to show updated remarks
             updateCurrentRunTable();
             
@@ -3490,6 +3519,9 @@
         
         // Clear edited cells tracker
         editedCells.clear();
+        
+        // Show the 'Previous Days' button again
+        viewArchivesButton.style.display = 'block';
         
         // Refresh the UI
         updateCurrentRunTable();
@@ -3574,6 +3606,9 @@
             // Clear edited cells tracker
             editedCells.clear();
             
+            // Show export button again
+            exportArchiveButton.style.display = 'block';
+            
             // Alert success
             alert('Changes to archived data saved successfully.');
         }
@@ -3594,6 +3629,7 @@
         isArchiveEditMode = false;
         archiveEditModeBtn.textContent = 'Enable Edit Mode';
         archiveEditModeBtn.style.backgroundColor = 'var(--primary)';
+        archiveEditControls.style.display = 'none'; // Hide controls
         document.querySelector('.archive-modal-content').classList.remove('editable-mode-active');
         
         // Remove editable attributes
@@ -3601,6 +3637,9 @@
         
         // Clear edited cells tracker
         editedCells.clear();
+        
+        // Show export button again
+        exportArchiveButton.style.display = 'block';
         
         // Refresh the UI - reload the selected date
         loadArchiveDataForSelectedDate();
@@ -3633,7 +3672,9 @@
     // Add to closeArchiveModalFunc - ensure edit mode is reset
     function closeArchiveModalFunc() {
       if (isArchiveEditMode) {
-        cancelArchiveEdits();
+        cancelArchiveEdits(); // This will also hide the controls
+      } else {
+         archiveEditControls.style.display = 'none'; // Ensure controls are hidden even if not in edit mode
       }
       archiveModal.style.display = 'none';
     }
