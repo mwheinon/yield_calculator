@@ -1258,7 +1258,7 @@
                 <span id="areaResult">-</span>
               </div>
               <div class="result-row">
-                <span class="result-label">Weight (tons):</span>
+                <span class="result-label">Weight (tons/lbs):</span>
                 <span id="weightResult">-</span>
               </div>
               <div class="result-row">
@@ -1279,7 +1279,7 @@
                 <span id="runTotalArea">0.00</span>
               </div>
               <div class="result-row">
-                <span class="result-label">Run Weight (tons):</span>
+                <span class="result-label">Run Weight (tons/lbs):</span>
                 <span id="runTotalWeight">0.00</span>
               </div>
               <div class="result-row">
@@ -1300,7 +1300,7 @@
                 <span id="dayTotalArea">0.00</span>
               </div>
               <div class="result-row">
-                <span class="result-label">Total Weight (tons):</span>
+                <span class="result-label">Total Weight (tons/lbs):</span>
                 <span id="dayTotalWeight">0.00</span>
               </div>
               <div class="result-row">
@@ -2071,7 +2071,7 @@
       const yieldVal = areaInSqYd > 0 ? (weightInPounds / areaInSqYd) : 0;
 
       areaResult.textContent = areaInSqYd.toFixed(2);
-      weightResult.textContent = tonnage.toFixed(2);
+      weightResult.textContent = `${tonnage.toFixed(2)} / ${weightInPounds.toLocaleString()} lbs`;
       yieldResult.textContent = yieldVal.toFixed(2);
 
       checkSaveButtonState(); // Check if save can be enabled
@@ -2382,7 +2382,7 @@
         const totals = calculateTotals(currentRunData);
         runTotalTrucks.textContent = totals.count;
         runTotalArea.textContent = totals.totalArea.toFixed(2);
-        runTotalWeight.textContent = totals.totalWeight.toFixed(2);
+        runTotalWeight.textContent = `${totals.totalWeight.toFixed(2)} / ${(totals.totalWeight * TONS_TO_POUNDS).toLocaleString()} lbs`;
         runAverageYield.textContent = totals.avgYield.toFixed(2);
     }
 
@@ -2391,7 +2391,7 @@
         const totals = calculateTotals(calendarDayData);
         dayTotalTrucks.textContent = totals.count;
         dayTotalArea.textContent = totals.totalArea.toFixed(2);
-        dayTotalWeight.textContent = totals.totalWeight.toFixed(2);
+        dayTotalWeight.textContent = `${totals.totalWeight.toFixed(2)} / ${(totals.totalWeight * TONS_TO_POUNDS).toLocaleString()} lbs`;
         dayAverageYield.textContent = totals.avgYield.toFixed(2);
     }
 
