@@ -5,21 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="format-detection" content="telephone=no" />
-  <!-- 4. App Name: Change the app's name to "HMA Paving". -->
   <title>HMA Paving</title>
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <!-- Manifest for PWA -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icons/icon-192x192.png" />
   <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192x192.png" />
-  <!-- Additional favicon format for better browser compatibility -->
   <link rel="shortcut icon" href="icons/icon-192x192.png" type="image/png" />
-  <!-- 12. Include SheetJS library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 
   <style>
-    /* ===== Base Styling with Reduced Fonts/Fields ===== */
     :root {
       --primary: #2b5797;
       --secondary: #4472c4;
@@ -1272,6 +1267,10 @@
             <div class="current-results">
               <h2>Current Truck Results</h2>
               <div class="result-row">
+                <span class="result-label">Length (ft):</span>
+                <span id="lengthResult">-</span>
+              </div>
+              <div class="result-row">
                 <span class="result-label">Area (sq yd):</span>
                 <span id="areaResult">-</span>
               </div>
@@ -1293,6 +1292,10 @@
                 <span id="runTotalTrucks">0</span>
               </div>
               <div class="result-row">
+                <span class="result-label">Run Length (ft):</span>
+                <span id="runTotalLength">0.00</span>
+              </div>
+              <div class="result-row">
                 <span class="result-label">Run Area (sq yd):</span>
                 <span id="runTotalArea">0.00</span>
               </div>
@@ -1312,6 +1315,10 @@
               <div class="result-row">
                 <span class="result-label">Total Trucks:</span>
                 <span id="dayTotalTrucks">0</span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">Total Length (ft):</span>
+                <span id="dayTotalLength">0.00</span>
               </div>
               <div class="result-row">
                 <span class="result-label">Total Area (sq yd):</span>
@@ -1353,7 +1360,7 @@
                 <th>Width (ft)</th>
                 <th>Area (sq yd)</th>
                 <th>Tonnage</th>
-                <!-- Remove weight column -->
+                <th>Weight (lbs)</th>
                 <th>Yield (lbs/sq yd)</th>
                 <th>Date</th>
                 <th>Action</th>
@@ -1371,7 +1378,7 @@
                 <td>-</td>
                 <td id="runTotalAreaFoot">0.00</td>
                 <td id="runTotalTonnageFoot">0.00</td>
-                <!-- Remove weight column -->
+                <td id="runTotalWeightFoot">0</td>
                 <td id="runAvgYieldFoot">0.00</td>
                 <td>-</td>
                 <td>-</td>
@@ -1420,7 +1427,7 @@
                     <th>Width (ft)</th>
                     <th>Area (sq yd)</th>
                     <th>Tonnage</th>
-                    <!-- Remove weight column -->
+                    <th>Weight (lbs)</th>
                     <th>Yield (lbs/sq yd)</th>
                     <th>Date</th>
                     <!-- 3. Add Remarks Feature: No column needed if shown in separator -->
@@ -1438,7 +1445,7 @@
                     <td>-</td>
                     <td id="archiveTotalAreaFoot">0.00</td>
                     <td id="archiveTotalTonnageFoot">0.00</td>
-                    <!-- Remove weight column -->
+                    <td id="archiveTotalWeightFoot">0</td>
                     <td id="archiveAvgYieldFoot">0.00</td>
                     <td>-</td>
                   </tr>
@@ -1638,7 +1645,7 @@
       <div style="margin-bottom: 20px;">
         <h3 style="color: var(--secondary); margin-bottom: 10px;">Author Information</h3>
         <p>Created by: Mark Heinonen</p>
-        <p>Version: 1.2.1</p>
+        <p>Version: 1.2.2</p>
         <p>Contact: heinonenmh@gmail.com</p>
         <button id="reportBugButton" onclick="window.location.href='mailto:heinonenmh@gmail.com?subject=Bug Report: HMA Paving App'" style="background-color: var(--secondary); color: white; padding: 6px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Report a Bug</button>
       </div>
@@ -1701,16 +1708,19 @@
     const areaResult = document.getElementById('areaResult');
     const weightResult = document.getElementById('weightResult');
     const yieldResult = document.getElementById('yieldResult');
+    const lengthResult = document.getElementById('lengthResult'); // NEW
     // Current Run Summary Display
     const runTotalTrucks = document.getElementById('runTotalTrucks');
     const runTotalArea = document.getElementById('runTotalArea');
     const runTotalWeight = document.getElementById('runTotalWeight');
     const runAverageYield = document.getElementById('runAverageYield');
+    const runTotalLength = document.getElementById('runTotalLength'); // NEW
     // Day Summary Display
     const dayTotalTrucks = document.getElementById('dayTotalTrucks'); // Renamed ID
     const dayTotalArea = document.getElementById('dayTotalArea');     // Renamed ID
     const dayTotalWeight = document.getElementById('dayTotalWeight');   // Renamed ID
     const dayAverageYield = document.getElementById('dayAverageYield'); // Renamed ID
+    const dayTotalLength = document.getElementById('dayTotalLength'); // NEW
     // Current Run Data Table (in Data History Tab)
     const truckDataBody = document.getElementById('truckDataBody');
     const runTotalLengthFoot = document.getElementById('runTotalLengthFoot'); // Renamed ID
@@ -2077,6 +2087,7 @@
       const tonnage = parseFloat(truckTonnageInput.value) || 0;
 
       if (length <= 0 || width <= 0 || tonnage <= 0) {
+        lengthResult.textContent = '-'; // NEW
         areaResult.textContent = '-';
         weightResult.textContent = '-';
         yieldResult.textContent = '-';
@@ -2089,6 +2100,7 @@
       const weightInPounds = tonnage * TONS_TO_POUNDS;
       const yieldVal = areaInSqYd > 0 ? (weightInPounds / areaInSqYd) : 0;
 
+      lengthResult.textContent = length.toFixed(2); // NEW
       areaResult.textContent = areaInSqYd.toFixed(2);
       weightResult.textContent = `${tonnage.toFixed(2)} / ${weightInPounds.toLocaleString()} lbs`;
       yieldResult.textContent = yieldVal.toFixed(2);
@@ -2328,6 +2340,7 @@
               <td>${(truck.width ?? 0).toFixed(2)}</td>
               <td>${(truck.area ?? 0).toFixed(2)}</td>
               <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
+              <td>${((truck.tonnage ?? 0) * 2000).toLocaleString()}</td>
               <td>${(truck.yield ?? 0).toFixed(2)}</td>
               <td>${formatDateForDisplay(truck.date) || ''}</td>
               <td><span class="delete-btn" data-id="${truck.id}">✖</span></td>
@@ -2356,6 +2369,7 @@
             <td>${(truck.width ?? 0).toFixed(2)}</td>
             <td>${(truck.area ?? 0).toFixed(2)}</td>
             <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
+            <td>${((truck.tonnage ?? 0) * 2000).toLocaleString()}</td>
             <td>${(truck.yield ?? 0).toFixed(2)}</td>
             <td>${formatDateForDisplay(truck.date) || ''}</td>
             <td><span class="delete-btn" data-id="${truck.id}">✖</span></td>
@@ -2392,7 +2406,7 @@
       runTotalLengthFoot.textContent = totals.totalLength.toFixed(2);
       runTotalAreaFoot.textContent = totals.totalArea.toFixed(2);
       runTotalTonnageFoot.textContent = totals.totalTonnage.toFixed(2);
-      //runTotalWeightFoot.textContent = totals.totalWeight.toFixed(2);
+      runTotalWeightFoot.textContent = (totals.totalWeight * TONS_TO_POUNDS).toLocaleString();
       runAvgYieldFoot.textContent = totals.avgYield.toFixed(2);
     }
 
@@ -2400,6 +2414,7 @@
     function updateCurrentRunSummary() {
         const totals = calculateTotals(currentRunData);
         runTotalTrucks.textContent = totals.count;
+        runTotalLength.textContent = totals.totalLength.toFixed(2); // NEW
         runTotalArea.textContent = totals.totalArea.toFixed(2);
         runTotalWeight.textContent = `${totals.totalWeight.toFixed(2)} / ${(totals.totalWeight * TONS_TO_POUNDS).toLocaleString()} lbs`;
         runAverageYield.textContent = totals.avgYield.toFixed(2);
@@ -2409,6 +2424,7 @@
     function updateDaySummary() {
         const totals = calculateTotals(calendarDayData);
         dayTotalTrucks.textContent = totals.count;
+        dayTotalLength.textContent = totals.totalLength.toFixed(2); // NEW
         dayTotalArea.textContent = totals.totalArea.toFixed(2);
         dayTotalWeight.textContent = `${totals.totalWeight.toFixed(2)} / ${(totals.totalWeight * TONS_TO_POUNDS).toLocaleString()} lbs`;
         dayAverageYield.textContent = totals.avgYield.toFixed(2);
@@ -2547,6 +2563,7 @@
                         <td>${(truck.width ?? 0).toFixed(2)}</td>
                         <td>${(truck.area ?? 0).toFixed(2)}</td>
                         <td>${(truck.tonnage ?? 0).toFixed(2)}</td>
+                        <td>${((truck.tonnage ?? 0) * 2000).toLocaleString()}</td>
                         <td>${(truck.yield ?? 0).toFixed(2)}</td>
                         <td>${formatDateForDisplay(truck.date) || ''}</td>
                     `;
@@ -2608,6 +2625,7 @@
             'Width (ft)': (item.width ?? 0).toFixed(2),
             'Area (sq yd)': (item.area ?? 0).toFixed(2),
             'Tonnage (tons)': (item.tonnage ?? 0).toFixed(2),
+            'Weight (lbs)': ((item.tonnage ?? 0) * 2000).toLocaleString(),
             'Yield (lbs/sq yd)': (item.yield ?? 0).toFixed(2)
             // Remarks could be added as a column if desired, but they are in separators visually
         }));
@@ -2616,7 +2634,7 @@
         const totals = calculateTotals(currentArchiveDisplayData);
         dataForSheet.push({ // Add an empty row for spacing
              'Date': '', 'Load Number': '', 'Start Sta.': '', 'End Sta.': '', 'Length (ft)': '',
-             'Width (ft)': '', 'Area (sq yd)': '', 'Tonnage (tons)': '', 'Yield (lbs/sq yd)': ''
+             'Width (ft)': '', 'Area (sq yd)': '', 'Tonnage (tons)': '', 'Weight (lbs)': '', 'Yield (lbs/sq yd)': ''
         });
         dataForSheet.push({
             'Date': 'TOTALS',
@@ -2627,6 +2645,7 @@
             'Width (ft)': '',
             'Area (sq yd)': totals.totalArea.toFixed(2),
             'Tonnage (tons)': totals.totalTonnage.toFixed(2),
+            'Weight (lbs)': (totals.totalWeight * 2000).toLocaleString(),
             'Yield (lbs/sq yd)': totals.avgYield.toFixed(2)
         });
 
@@ -2644,6 +2663,7 @@
                 { wch: 12 }, // Width (ft)
                 { wch: 13 }, // Area (sq yd)
                 { wch: 14 }, // Tonnage (tons)
+                { wch: 18 },  // Weight (lbs)
                 { wch: 18 }  // Yield (lbs/sq yd)
             ];
             worksheet['!cols'] = columnWidths;
@@ -2781,6 +2801,7 @@
             'Width (ft)': (item.width ?? 0).toFixed(2),
             'Area (sq yd)': (item.area ?? 0).toFixed(2),
             'Tonnage (tons)': (item.tonnage ?? 0).toFixed(2),
+            'Weight (lbs)': ((item.tonnage ?? 0) * 2000).toLocaleString(),
             'Yield (lbs/sq yd)': (item.yield ?? 0).toFixed(2)
         }));
         
@@ -2788,7 +2809,7 @@
         const totals = calculateTotals(dataToExport);
         dataForSheet.push({ // Add an empty row for spacing
              'Date': '', 'Load Number': '', 'Start Sta.': '', 'End Sta.': '', 'Length (ft)': '',
-             'Width (ft)': '', 'Area (sq yd)': '', 'Tonnage (tons)': '', 'Yield (lbs/sq yd)': ''
+             'Width (ft)': '', 'Area (sq yd)': '', 'Tonnage (tons)': '', 'Weight (lbs)': '', 'Yield (lbs/sq yd)': ''
         });
         dataForSheet.push({
             'Date': 'TOTALS',
@@ -2799,6 +2820,7 @@
             'Width (ft)': '',
             'Area (sq yd)': totals.totalArea.toFixed(2),
             'Tonnage (tons)': totals.totalTonnage.toFixed(2),
+            'Weight (lbs)': (totals.totalWeight * 2000).toLocaleString(),
             'Yield (lbs/sq yd)': totals.avgYield.toFixed(2)
         });
         
@@ -2816,6 +2838,7 @@
                 { wch: 12 }, // Width (ft)
                 { wch: 13 }, // Area (sq yd)
                 { wch: 14 }, // Tonnage (tons)
+                { wch: 18 },  // Weight (lbs)
                 { wch: 18 }  // Yield (lbs/sq yd)
             ];
             worksheet['!cols'] = columnWidths;
